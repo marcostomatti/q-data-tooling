@@ -227,6 +227,34 @@ describe('startService', () => {
         restore('PORT', saved);
       }
     });
+
+    /** Holds a port open until `release`, so a start on it finds it taken. */
+    async function heldPort(): Promise<{ readonly port: number, release(): Promise<void> }> {
+      const holder = createNetServer();
+      await new Promise<void>((resolve) => holder.listen(0, resolve));
+      const address = holder.address();
+      if (address === null || typeof address === 'string') throw new Error('the holder reports no port');
+      return { port: address.port, release: () => new Promise<void>((resolve) => holder.close(() => resolve())) };
+    }
+
+    test.each([
+      ['PORT', (port: number) => ({ env: String(port), opts: {} })],
+      ['port', (port: number) => ({ env: undefined, opts: { port } })],
+    ] as const)('a taken port under PORT_STRICT=true is refused with a message naming %s, where the port came from', async (key, where) => {
+      const saved = { port: process.env.PORT, strict: process.env.PORT_STRICT };
+      const held = await heldPort();
+      const { env, opts } = where(held.port);
+      restore('PORT', env);
+      process.env.PORT_STRICT = 'true';
+
+      try {
+        await expect(start(opts)).rejects.toThrow(`port ${held.port} is taken; set ${key} to a free port`);
+      } finally {
+        restore('PORT', saved.port);
+        restore('PORT_STRICT', saved.strict);
+        await held.release();
+      }
+    });
   });
 
   describe('the start lines', () => {

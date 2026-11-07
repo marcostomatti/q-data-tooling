@@ -93,14 +93,16 @@ function assertPort(port: number, what: string): number {
 }
 
 /**
- * The port from the caller, else `PORT`, else undefined for the chassis to pick; a port that is
- * not a port number is refused before anything opens.
+ * The port option to hand the chassis: the caller's, else undefined. A port that is not a port
+ * number is refused before anything opens, `PORT` included, but `PORT` is left for the chassis to
+ * read itself: the chassis names the setting a port came from when that port is taken, so a
+ * `PORT` passed on as the option would send the operator to `port`, which only code can set.
  */
 function resolvePort(requested: number | undefined, env: NodeJS.ProcessEnv): number | undefined {
   if (requested !== undefined) return assertPort(requested, 'the port option');
   const raw = env.PORT;
-  if (raw === undefined || raw === '') return undefined;
-  return assertPort(Number(raw), 'PORT');
+  if (raw !== undefined && raw !== '') assertPort(Number(raw), 'PORT');
+  return undefined;
 }
 
 /**

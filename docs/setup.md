@@ -68,8 +68,10 @@ bun run serve
 `API_KEY` in `.env`, and shows it once. The screen clears after 30 seconds, and `cat .env`
 shows the key again.
 
-`bun run serve` listens on port 3000 on every network interface, so keep it off networks you
-do not trust. From a second terminal:
+`bun run serve` listens on port 3000 on every network interface, so keep it off networks you do
+not trust. When another program holds 3000, it takes the next free port instead and logs a
+warning naming both, and its `started` line gives the `url`: use that port below, or set
+`PORT_STRICT=true` to stop instead. From a second terminal:
 
 ```sh
 curl -s localhost:3000/health
@@ -81,8 +83,9 @@ to any request without a good credential.
 
 ## The HTTP service
 
-`bun run serve` listens on port 3000 (`PORT` changes it). Its routes are the `ROUTES` list in
-`src/routes/http.ts`, mounted under `/api`: today, `GET /api/info`.
+`bun run serve` listens on port 3000 (`PORT` changes it), or on the next free port when that one
+is taken. Its routes are the `ROUTES` list in `src/routes/http.ts`, mounted under `/api`: today,
+`GET /api/info`.
 
 Every `/api` response uses one envelope: `{ "success": true, "data": ... }`, or on failure
 `{ "success": false, "error": { "name": "...", "message": "..." } }`. The names are

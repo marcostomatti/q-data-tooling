@@ -19,9 +19,10 @@ Turn it on when an agent should call the service. Two transports carry it:
   it. Whoever can start the process can call every tool, so the API key, the tokens and sign-in
   play no part.
 - **HTTP**, opt-in with `MCP_TRANSPORT=http`. The server listens on port 8080, or on `PORT` when
-  that is set, on every network interface. Nothing authenticates it either: anyone who reaches the
-  port can call every tool, writes included. Use it only behind a firewall that admits loopback
-  alone, or behind your own proxy.
+  that is set, on every network interface. A taken port moves to the next free one, which the
+  `started` line names. Nothing authenticates it either: anyone who reaches the port can call
+  every tool, writes included. Use it only behind a firewall that admits loopback alone, or behind
+  your own proxy.
 
 ### The tools
 
@@ -125,7 +126,8 @@ Opt in and start the server in a terminal, and leave it running:
 MCP_TRANSPORT=http bun run mcp
 ```
 
-Point a client at `http://localhost:8080/mcp`. For Claude Code:
+Point a client at `http://localhost:8080/mcp`, or at the `url` the `started` line names when 8080
+was taken. For Claude Code:
 
 ```sh
 claude mcp add --transport http template-service http://localhost:8080/mcp
