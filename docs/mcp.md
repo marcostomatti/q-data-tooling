@@ -45,12 +45,17 @@ text block, `{"error": "<the message>"}`. A new tool is added by `/be create-rou
 
 ### Logs and trace ids
 
-Over stdio, stdout carries the protocol, so the server's own log lines go to stderr. Each line is
-one pino-shaped JSON object, filtered by `LOG_LEVEL`. The two start lines are plain text on stderr:
+Over stdio, stdout carries the protocol, so every log line goes to stderr, the package's own lines
+included, and stdout holds JSON-RPC alone. Over HTTP the same lines go to stdout. `LOG_LEVEL`
+filters them, and `LOG_FORMAT` picks their shape: `json` writes one pino-shaped JSON object a
+line, `terminal` one readable line, and unset picks `terminal` when the log's output is a terminal
+and `json` when it is not, as when a client starts the server. The start lines are logged under
+domain `Mcp` and scope `start`, and the package's `started` line follows them:
 
 ```text
-registered 1 MCP tools
-notebook tools off: OPEN_NOTEBOOK_URL is not set
+{"level":30,"time":1794081158289,"service":"template-service","domain":"Mcp","scope":"start","step":"register","tools":1,"msg":"registered MCP tools"}
+{"level":30,"time":1794081158289,"service":"template-service","domain":"Mcp","scope":"start","step":"addNotebook","notebookTools":0,"msg":"notebook tools off: OPEN_NOTEBOOK_URL is not set"}
+{"level":30,"time":1794081158291,"service":"template-service","version":"unknown","transport":"stdio","features":{},"msg":"started"}
 ```
 
 Each tool call gets a new `traceId`, a random UUID, and every line written while that call runs
@@ -59,14 +64,8 @@ unlike the HTTP routes. `service_info` writes one debug line, so its trace id sh
 `LOG_LEVEL=debug` or lower:
 
 ```json
-{"level":20,"service":"mcp","traceId":"92d566d1-0961-443d-a56c-85642c92cda8","domain":"Info","scope":"get","step":"read","dialect":"sqlite","notebook":false,"msg":"service info read"}
+{"level":20,"time":1794081158309,"service":"template-service","traceId":"c7d3e367-4c99-44f1-8052-0aa107defca0","domain":"Info","scope":"get","step":"read","dialect":"sqlite","notebook":false,"msg":"service info read"}
 ```
-
-One exception breaks the rule. The package that starts the server writes its own lines through the
-same pino logger, to stdout: `Shutting down MCP server...` and `Shutdown complete` when the server
-stops, and `Failed to start MCP server` when setup fails. They are JSON, but not JSON-RPC, so a
-client should skip any stdout line that is not a JSON-RPC message. Over HTTP, stdout is free and
-the start lines go there too, under domain `Mcp` and scope `start`.
 
 ## Setup from zero
 
@@ -136,8 +135,10 @@ The transport is Streamable HTTP and stateful. A client's `initialize` gets a se
 client sends on its later requests. The server keeps one session per start, so a second client,
 or a client after a disconnect, needs a restart of the server.
 
-The package also starts a health endpoint at `http://localhost:3001/health`. Its port is always
-3001: `PORT` moves the MCP port and leaves that one where it is.
+The package also starts a health endpoint, at `http://localhost:3001/health` by default.
+`HEALTH_PORT` moves it, and `PORT` moves only the MCP port. A taken port, either one, falls back
+to the next free one with a warning, and the `started` line names the bound addresses as `url` and
+`healthUrl`.
 
 ## Configuration
 
@@ -147,7 +148,11 @@ These are the MCP rows of the [configuration table](setup.md#configuration), wit
 | --- | --- | --- | --- |
 | `MCP_TRANSPORT` | unset, stdio | `stdio` or unset for stdio. Only the exact value `http` opts in to HTTP. Any other value exits 1 at start. | `src/mcp/transport.ts`, `src/mcp/server.ts` |
 | `PORT` | `8080` for MCP over HTTP | The port of the MCP HTTP transport. A whole number from 1 to 65535. It does not move the health port. | the service-mcp package |
-| `LOG_LEVEL` | `info` | The lowest level written: `trace`, `debug`, `info`, `warn`, `error`, `fatal` or `silent`. | `src/logging.ts`, the service-express package |
+| `PORT_STRICT` | unset | `true` stops the start with an error naming the port when it is taken. Unset, a taken port falls back to the next free one with a warning. | the service-express package, the service-mcp package |
+| `HEALTH_PORT` | `3001` | The port of the health endpoint the MCP server starts over HTTP. A whole number. `PORT` does not move it. | the service-mcp package |
+| `HEALTH_PORT_STRICT` | unset | `true` stops the MCP server when the health port is taken. Unset, it falls back to the next free one with a warning. | the service-mcp package |
+| `LOG_LEVEL` | `info` | The lowest level written: `trace`, `debug`, `info`, `warn`, `error`, `fatal` or `silent`. | the service-logger package |
+| `LOG_FORMAT` | unset | `terminal` for one readable line per record, `json` for pino's JSON line. Unset picks `terminal` when the output is a terminal and `json` when it is not. | the service-logger package |
 | `DATABASE_URL` | unset, `./data/app.db` | The database the tools read. It is read from the directory the server starts in. | `src/data/sqlite/client.ts`, `src/data/pg/client.ts` |
 | `OPEN_NOTEBOOK_URL` | unset, notebook tools off | The notebook's address, `http://` or `https://`, with no user or password in it. When the notebook answers at start, eight `notebook_*` tools are added. | `src/notebook/config.ts`, `src/notebook/startup.ts` |
 | `OPEN_NOTEBOOK_API_KEY` | unset | The notebook's password, sent to it as a bearer token. Unset for a notebook with no password. | `src/notebook/config.ts` |
@@ -161,9 +166,10 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocol
 ```
 
 It prints two JSON lines on stdout. The first is the `initialize` result, whose `serverInfo` names
-`template-service`. The second lists the tools, and it names `service_info`. On stderr it prints
-`registered 1 MCP tools`, plus the notebook line. The server exits when the input ends. The same
-`tools/list` over HTTP, from a client connected to `/mcp`, gives the same list.
+`template-service`. The second lists the tools, and it names `service_info`. On stderr it logs the
+start lines shown under [Logs and trace ids](#logs-and-trace-ids): `registered MCP tools`, the
+notebook line, then `started`. The server exits when the input ends. The same `tools/list` over
+HTTP, from a client connected to `/mcp`, gives the same list.
 
 ## Turn it off
 
@@ -185,7 +191,8 @@ MCP_TRANSPORT is "HTTP", which is not a transport. Leave it unset or set it to "
 The check is exact and case-sensitive, so `HTTP` and a stray space are refused. Fix the line in
 `.env`. A blank value is stdio.
 
-Startup says why the notebook tools are off, on stderr:
+Startup logs why the notebook tools are off, as the message of an `info` line, on stderr over
+stdio. `LOG_LEVEL=warn` or higher hides it:
 
 ```text
 notebook tools off: OPEN_NOTEBOOK_URL is not set
@@ -198,20 +205,22 @@ A notebook that does not answer in time gives `notebook tools off:` followed by 
 message. When the tools are on, the line reads `notebook tools on: 8 Open Notebook tools`, and
 it adds a warning when the key would travel in clear over plain `http` to another host.
 
-Over HTTP, a health port 3001 that another program holds stops the server. Bun prints:
+Over HTTP, a port that another program holds does not stop the server. It takes the next free port
+and logs a warning, such as:
 
 ```text
-error: Failed to start server. Is port 3001 in use?
+port 3001 is taken, falling back to 3002; set health.strictPort or HEALTH_PORT_STRICT=true to fail instead
 ```
 
-Port 3001 is the health port, and `PORT` does not change it. Stop the program that holds it, then
-start the server again.
+The `started` line then names the ports bound, as `url` and `healthUrl`, so point a client at
+those. With `PORT_STRICT=true`, or `HEALTH_PORT_STRICT=true` for the health port, a held port
+stops the server with exit code 1 instead, and the error line reads
+`port 3001 is taken; set health.port to a free port`. Stop the program that holds the port, or set
+`PORT` or `HEALTH_PORT` to a free one.
 
 A client that lists no tools, or fails to start the server, usually started it from another
 directory. `.env` and `data/app.db` are read from the directory the command runs in. Use the
 `--cwd` form above, with the clone's absolute path.
 
 A tool that fails answers `isError: true` with `{"error": "<message>"}`. The message is the one the
-tool's error gives, and [the logs](#logs-and-trace-ids) show the trace id of the failed call. Over
-stdio, a stdout line that is not JSON-RPC is the shutdown line described above, not a fault in a
-tool.
+tool's error gives, and [the logs](#logs-and-trace-ids) show the trace id of the failed call.

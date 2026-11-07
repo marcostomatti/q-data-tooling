@@ -4,7 +4,7 @@ import type { Log } from '../../src/logging.ts';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { describe, expect, spyOn, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 
 import { ConflictError, NotFoundError } from '../../src/errors.ts';
@@ -136,43 +136,6 @@ describe('registerTools', () => {
     expect(first[1]).toBe(first[0]);
     expect(second[1]).toBe(second[0]);
     expect(second[0]).not.toBe(first[0]);
-  });
-
-  test('without a log, a tool line goes to stderr and never to stdout, which stdio MCP owns', async () => {
-    const loud = defineTool({
-      name: 'loud',
-      title: 'Loud',
-      description: 'Logs one error line.',
-      input: z.strictObject({}),
-      run: async (_args, { log }) => {
-        log.error({ step: 'probe' }, 'loud tool line');
-        return 'ok';
-      },
-    });
-    const server = new McpServer({ name: 'test', version: '0.0.0' });
-    registerTools(server, stubDb, [loud]);
-    const client = new Client({ name: 'test-client', version: '0.0.0' });
-    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-    await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
-    const stdout = spyOn(process.stdout, 'write').mockImplementation(() => true);
-    const stderr = spyOn(process.stderr, 'write').mockImplementation(() => true);
-
-    const written = (calls: unknown[][]): string => calls.map((args) => String(args[0])).join('');
-    let onStdout: string;
-    let onStderr: string;
-    try {
-      await call(client, 'loud', {});
-      // Read before restoring: mockRestore clears the recorded calls.
-      onStdout = written(stdout.mock.calls);
-      onStderr = written(stderr.mock.calls);
-    } finally {
-      stdout.mockRestore();
-      stderr.mockRestore();
-    }
-
-    expect(onStdout).not.toContain('loud tool line');
-    // The control: the line was written, so its absence from stdout is not a line never made.
-    expect(onStderr).toContain('loud tool line');
   });
 
   test('a handler that throws returns an isError result rather than rejecting', async () => {

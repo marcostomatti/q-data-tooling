@@ -6,7 +6,7 @@ import type { z, ZodType } from 'zod';
 
 import { randomUUID } from 'node:crypto';
 
-import { stderrLogger, TRACE_ID_FIELD } from '../logging.ts';
+import { TRACE_ID_FIELD } from '../logging.ts';
 
 import { errorResult, okResult } from './result.ts';
 
@@ -78,17 +78,16 @@ export function defineTool<S extends ZodType>(spec: ToolSpec<S>): ToolDefinition
  * throws) is the only place that may, and a test can pass a bare `McpServer`. The SDK throws
  * when two definitions share a name.
  *
- * `log` is the base log; each call binds a fresh `crypto.randomUUID()` as `traceId` on a child
- * of it and hands that child to `run` with the database, so every line one call writes carries
- * the same id and no two calls share one. It defaults to the `mcp` logger on stderr, because
- * over stdio stdout carries the protocol and a line written there would corrupt the stream. A
- * test passes a capturing fake.
+ * `log` is the base log, the package's logger through `setupMcp`, which writes to stderr on
+ * stdio, where stdout carries the protocol. Each call binds a fresh `crypto.randomUUID()` as
+ * `traceId` on a child of it and hands that child to `run` with the database, so every line one
+ * call writes carries the same id and no two calls share one. A test passes a capturing fake.
  */
 export function registerTools(
   server: McpServer,
   db: Db,
   definitions: readonly ToolDefinition[],
-  log: Log = stderrLogger('mcp'),
+  log: Log,
 ): void {
   for (const definition of definitions) {
     server.registerTool(

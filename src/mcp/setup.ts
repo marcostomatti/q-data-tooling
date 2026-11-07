@@ -24,26 +24,23 @@ export interface McpSetup {
   /** The notebook probe's outcome, or `undefined` when none ran. */
   readonly notebook: NotebookStartup | undefined
   readonly transport: McpTransport
-  /** The base log, the package's logger in `server.ts`; the start lines bind `Mcp` and `start` on it. */
+  /**
+   * The base log, the package's logger in `server.ts`, which writes to stderr on stdio and to
+   * stdout over HTTP. The start lines bind `Mcp` and `start` on it, and each tool call logs on a
+   * child of it.
+   */
   readonly log: Log
-  /** Writes one line to stderr; used in stdio mode, where the log writes to the protocol channel. */
-  readonly writeStderr: (text: string) => void
 }
 
 /**
- * Registers `tools` on `server` and reports how many. On stdio, stdout is the protocol channel
- * and the package's logger writes to it, so a log line there would corrupt the stream: the count
- * and the notebook message go to stderr as plain text. Over HTTP they are logged on `log`, under
- * domain `Mcp` and scope `start`, with steps `register` and `addNotebook`.
+ * Registers `tools` on `server`, each call logging on `log`, and reports how many on `log`, under
+ * domain `Mcp` and scope `start`, with steps `register` and `addNotebook`. On stdio stdout is the
+ * protocol channel, and the package's logger already writes to stderr there, so the same lines
+ * are safe on both transports.
  */
 export function setupMcp(server: McpServer, setup: McpSetup): void {
-  registerTools(server, setup.db, setup.tools);
+  registerTools(server, setup.db, setup.tools, setup.log);
   const { notebook, tools } = setup;
-  if (setup.transport === 'stdio') {
-    setup.writeStderr(`registered ${tools.length} MCP tools\n`);
-    if (notebook) setup.writeStderr(`${notebook.message}\n`);
-    return;
-  }
   const log = scoped(inDomain(setup.log, DOMAIN), 'start');
   log.info({ step: 'register', tools: tools.length }, 'registered MCP tools');
   if (notebook) log.info({ step: 'addNotebook', notebookTools: notebook.tools.length }, notebook.message);

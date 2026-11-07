@@ -5,7 +5,8 @@
  *
  * The source is the code git would track under `src/` and `scripts/`, test files left out. In
  * TypeScript a read is a property or index of `process.env`, of `Bun.env` or of a value declared
- * with an environment's type, `NodeJS.ProcessEnv` or `Record<string, string | undefined>`:
+ * with an environment's type, `NodeJS.ProcessEnv` or `Record<string, string | undefined>`, or set
+ * to the environment itself, as a dependency's compiled `env = process.env` default parameter is:
  * `.NAME`, `?.NAME`, `['NAME']`, `[CONST]` with `CONST` a string constant of the same file, or the
  * string after it in a call such as `value(env, 'NAME')`. A `Record<string, string>` is an
  * environment the code builds for a child, not one it reads, so the `PG*` names the backup passes
@@ -39,6 +40,7 @@ const AMBIENT: ReadonlySet<string> = new Set(['PATH', 'NODE_ENV']);
 const NAME = '[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*';
 const COMMENT_LINE = /^\s*(?:\/\/|\/\*|\*|#)/;
 const ENV_TYPE = /\b(\w+)\??:\s*(?:Readonly<)?(?:NodeJS\.ProcessEnv|Record<string, string \| undefined>)/g;
+const ENV_ALIAS = /\b(\w+)\s*=\s*(?:process|Bun)\.env\b(?!\s*(?:\.|\?\.|\[))/g;
 const STRING_CONST = new RegExp(`\\bconst\\s+(\\w+)\\s*=\\s*'(${NAME})'`, 'g');
 const SHELL_READ = new RegExp(`\\$\\{(${NAME}):?-`, 'g');
 const COMPOSE_READ = new RegExp(`(?<!\\$)\\$\\{(${NAME})`, 'g');
@@ -98,7 +100,8 @@ function captures(text: string, pattern: RegExp): readonly string[] {
 export function codeReads(source: string): ReadonlySet<string> {
   const text = codeLines(source);
   const constants = new Map([...text.matchAll(STRING_CONST)].map((match) => [match[1] ?? '', match[2] ?? '']));
-  const holders = ['process.env', 'Bun.env', ...new Set(captures(text, ENV_TYPE))].map(escaped).join('|');
+  const declared = [...captures(text, ENV_TYPE), ...captures(text, ENV_ALIAS)];
+  const holders = ['process.env', 'Bun.env', ...new Set(declared)].map(escaped).join('|');
   const read = (tail: string): RegExp => new RegExp(`(?<![\\w$])(?:${holders})${tail}`, 'g');
   const direct = [
     ...captures(text, read(`\\??\\.(${NAME})\\b`)),
@@ -167,13 +170,14 @@ export function scanEnv(input: EnvInput): EnvScan {
   const sources = [...input.sourceReads].map(([name, files]) => ({ name, where: files.join(', ') }));
   const readByPackage = (row: ConfigRow): boolean => packagesNamed(row.readBy)
     .some((name) => input.packageReads.get(name)?.has(row.name) === true);
+  const packageRead = new Set(input.table.filter(readByPackage).map((row) => row.name));
   return {
     notInExample: sources
       .filter(({ name }) => !example.has(name) && !AMBIENT.has(name))
       .map(({ name, where }) => `${name} (${where})`),
     notInTable: sources.filter(({ name }) => !tabled.has(name)).map(({ name, where }) => `${name} (${where})`),
     unread: [
-      ...input.example.filter((name) => !readHere(name)).map((name) => `.env.example ${name}`),
+      ...input.example.filter((name) => !readHere(name) && !packageRead.has(name)).map((name) => `.env.example ${name}`),
       ...input.table
         .filter((row) => !readHere(row.name) && !readByPackage(row))
         .map((row) => `docs/setup.md:${row.line} ${row.name}`),
@@ -246,6 +250,16 @@ describe('the read rules (failing control)', () => {
     expect([...codeReads(source)].sort()).toEqual(['ALPHA', 'BETA', 'DELTA', 'EPSILON', 'ETA', 'GAMMA', 'ZETA']);
   });
 
+  test('codeReads reads through a value set to the environment, as compiled JavaScript defaults a parameter', () => {
+    const source = [
+      'function h(env = process.env) { return env.THETA ?? value(env, \'IOTA\'); }',
+      'const copy = { ...process.env }; const other = settings; other.KAPPA; copy.LAMBDA;',
+      'const vars = process.env ?? {}; vars.MU; const one = process.env.NU; one.XI;',
+    ].join('\n');
+
+    expect([...codeReads(source)].sort()).toEqual(['IOTA', 'MU', 'NU', 'THETA']);
+  });
+
   test('shellReads and composeReads read only their forms', () => {
     const shell = '# ${IN_COMMENT:-}\nif [ -n "${ALPHA:-}" ]; then x="$BETA ${BASH_SOURCE[0]} ${GAMMA-x}"; fi';
     const compose = '# ${IN_COMMENT}\nports:\n  - \'${ALPHA:-5432}:5432\'\n  x: ${BETA}\n  y: $${ESCAPED}';
@@ -304,8 +318,14 @@ describe('scanEnv (failing control)', () => {
   });
 
   test('a package read counts only for the package its row names', () => {
-    const elsewhere = { ...input, packageReads: new Map([['other', new Set(['REDACT'])]]) };
+    const elsewhere = { ...input, example: [...input.example, 'REDACT'], packageReads: new Map([['other', new Set(['REDACT'])]]) };
     expect(scanEnv(elsewhere).unread).toContain('docs/setup.md:9 REDACT');
+    expect(scanEnv(elsewhere).unread).toContain('.env.example REDACT');
+  });
+
+  test('an .env.example name is read when the package its table row names reads it', () => {
+    const listed = { ...input, example: [...input.example, 'REDACT'] };
+    expect(scanEnv(listed).unread).not.toContain('.env.example REDACT');
   });
 
   test('passes once every read is listed and every listed name is read', () => {

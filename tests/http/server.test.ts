@@ -2,15 +2,15 @@ import type { SpawnRequest, Spawner } from '../../src/backup/pg-dump.ts';
 import type { BackupTimers } from '../../src/backup/schedule.ts';
 import type { Log } from '../../src/logging.ts';
 import type { ServiceHandle } from '@open-tomato/service-express';
-import type { Server } from 'node:http';
 
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import http from 'node:http';
+import { createServer as createNetServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, spyOn, test } from 'bun:test';
 import { sql } from 'drizzle-orm';
-import express from 'express';
 
 import { APP } from '../../src/app-config.ts';
 import { GENERATED_KEY_LENGTH } from '../../src/auth/api-key.ts';
@@ -20,7 +20,7 @@ import { MEMORY_DATABASE } from '../../src/data/sqlite/client.ts';
 import { APP_PATHS, backupOptionsFor, startService } from '../../src/http/server.ts';
 import { countingDb } from '../backup/db-proxies.ts';
 import { captureLog } from '../support/capture-log.ts';
-import { startCapturingServers } from '../support/service-process.ts';
+import { startInTest } from '../support/service-process.ts';
 import { openMigratedMemoryDb, type SqliteTestClient } from '../support/sqlite-db.ts';
 
 /**
@@ -29,25 +29,50 @@ import { openMigratedMemoryDb, type SqliteTestClient } from '../support/sqlite-d
  */
 const TEST_KEY = 'test-key-for-the-server-entry-'.padEnd(GENERATED_KEY_LENGTH, 'k');
 
-type Running = {
-  readonly handle: ServiceHandle
-  /** Every server `app.listen` created while the service started: the chassis's own is the first. */
-  readonly chassisServers: readonly Server[]
-};
+type Running = { readonly handle: ServiceHandle };
 
 const savedEnv = { apiKey: process.env.API_KEY, databaseUrl: process.env.DATABASE_URL, logLevel: process.env.LOG_LEVEL };
 let running: Running | undefined;
 
 /**
- * Starts the service in this process, on the `:memory:` database `beforeEach` names.
- * `startCapturingServers` collects the chassis's own server, so a test can see it listen and
- * close. No request is sent: a request is answered and logged by the chassis's request logger,
- * which has no level setting. The routes are tested without the service, in `routes.test.ts` and `handler.test.ts`.
+ * Starts the service in this process, on the `:memory:` database `beforeEach` names. A test sees
+ * it listen through {@link answers} on the handle's `url`; the chassis logs each request on the
+ * service logger, which `LOG_LEVEL=silent` quiets. The routes are tested without the service, in
+ * `routes.test.ts` and `handler.test.ts`.
  */
 async function start(opts?: Parameters<typeof startService>[0]): Promise<Running> {
-  const { handle, servers } = await startCapturingServers(opts);
-  running = { handle, chassisServers: servers };
+  running = { handle: await startInTest(opts) };
   return running;
+}
+
+/** Whether a service answers `GET /health` at `url`; false when nothing listens there. */
+async function answers(url: string): Promise<boolean> {
+  return fetch(`${url}/health`).then((response) => response.ok, () => false);
+}
+
+/** A port nothing listens on now: the OS picks one, and the probe closes it again. */
+async function freePort(): Promise<number> {
+  const probe = createNetServer();
+  await new Promise<void>((resolve) => probe.listen(0, resolve));
+  const address = probe.address();
+  await new Promise<void>((resolve) => probe.close(() => resolve()));
+  if (address === null || typeof address === 'string') throw new Error('the probe reports no port');
+  return address.port;
+}
+
+/**
+ * Runs `act` with `http.Server.prototype.listen` watched, and returns the port each call asked
+ * for. The chassis listens with `createServer(app).listen(port)`. The calls are read before the
+ * spy is restored, because a restore clears them.
+ */
+async function listenedPorts(act: () => Promise<unknown>): Promise<readonly unknown[]> {
+  const listen = spyOn(http.Server.prototype, 'listen');
+  try {
+    await act();
+    return listen.mock.calls.map((call) => call[0]);
+  } finally {
+    listen.mockRestore();
+  }
 }
 
 async function stopRunning(): Promise<void> {
@@ -106,19 +131,16 @@ describe('startService', () => {
     // orders apart. The value is made up and names nothing.
     process.env.DATABASE_URL = 'postgres://nobody:unused@localhost:1/nothing';
     await closeDb();
-    const listen = spyOn(express.application, 'listen');
+    let failure: unknown;
 
-    try {
-      const failure = await startService().catch((error: unknown) => error);
+    const ports = await listenedPorts(async () => {
+      failure = await startService().catch((error: unknown) => error);
+    });
 
-      expect(failure).toBeInstanceOf(Error);
-      expect((failure as Error).message).toMatch(/API_KEY/);
-      expect((failure as Error).message).not.toMatch(/database/i);
-      expect(listen).not.toHaveBeenCalled();
-    } finally {
-      listen.mockRestore();
-    }
-    expect(typeof express.application.listen).toBe('function');
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toMatch(/API_KEY/);
+    expect((failure as Error).message).not.toMatch(/database/i);
+    expect(ports).toEqual([]);
   });
 
   test('the refusal names the fix', async () => {
@@ -146,27 +168,65 @@ describe('startService', () => {
   });
 
   test('starts on the :memory: database DATABASE_URL names', async () => {
-    const { chassisServers } = await start();
+    const { handle } = await start();
 
-    expect(chassisServers[0]?.listening).toBe(true);
+    expect(await answers(handle.url)).toBe(true);
     expect(await selectOne(getDb())).toEqual([{ one: 1 }]);
   });
 
   test('a DATABASE_URL that names no SQLite database stops the start before anything listens', async () => {
     process.env.DATABASE_URL = 'postgres://nobody:unused@localhost:1/nothing';
     await closeDb();
-    const listen = spyOn(express.application, 'listen');
+    let failure: unknown;
 
-    try {
-      const failure = await startService().catch((error: unknown) => error);
+    const ports = await listenedPorts(async () => {
+      failure = await startService().catch((error: unknown) => error);
+    });
 
-      expect(failure).toBeInstanceOf(Error);
-      expect((failure as Error).message).toMatch(/DATABASE_URL/);
-      expect((failure as Error).message).not.toContain('unused');
-      expect(listen).not.toHaveBeenCalled();
-    } finally {
-      listen.mockRestore();
-    }
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toMatch(/DATABASE_URL/);
+    expect((failure as Error).message).not.toContain('unused');
+    expect(ports).toEqual([]);
+  });
+
+  describe('the port', () => {
+    test('with neither a port option nor PORT, asks the OS for a free port under NODE_ENV=test', async () => {
+      const saved = process.env.PORT;
+      delete process.env.PORT;
+
+      try {
+        const ports = await listenedPorts(() => start());
+
+        // The control for the refusals above: a start that listens is seen listening
+        expect(ports).toEqual([0]);
+        expect(await answers(running!.handle.url)).toBe(true);
+      } finally {
+        restore('PORT', saved);
+      }
+    });
+
+    test('a port option is bound as given', async () => {
+      const port = await freePort();
+
+      const { handle } = await start({ port });
+
+      expect(handle.port).toBe(port);
+      expect(await answers(handle.url)).toBe(true);
+    });
+
+    test('a PORT is bound as given', async () => {
+      const saved = process.env.PORT;
+      const port = await freePort();
+      process.env.PORT = String(port);
+
+      try {
+        const { handle } = await start();
+
+        expect(handle.port).toBe(port);
+      } finally {
+        restore('PORT', saved);
+      }
+    });
   });
 
   describe('the start lines', () => {
@@ -207,15 +267,15 @@ describe('startService', () => {
   });
 
   test('stop() closes the server and the database', async () => {
-    const { handle, chassisServers } = await start();
+    const { handle } = await start();
     const db = getDb();
     await selectOne(db);
-    expect(chassisServers[0]?.listening).toBe(true);
+    expect(await answers(handle.url)).toBe(true);
 
     await handle.stop();
     running = undefined;
 
-    expect(chassisServers[0]?.listening).toBe(false);
+    expect(await answers(handle.url)).toBe(false);
     const afterStop = (async () => selectOne(db))();
     await expect(afterStop).rejects.toThrow();
   });
@@ -282,11 +342,11 @@ describe('startService', () => {
 
         try {
           // Act: startService resolves although the first check is waiting on the gate
-          const { chassisServers } = await start({ backup: { dialect: 'pg', db: scratch, outDir: backupDir, spawn, timers, databaseUrl: FAKE_URL, logger: silent } });
+          const { handle } = await start({ backup: { dialect: 'pg', db: scratch, outDir: backupDir, spawn, timers, databaseUrl: FAKE_URL, logger: silent } });
           await until(() => calls.length === 1);
 
           // Assert: the dump is still in flight and the service already listens
-          expect(chassisServers[0]?.listening).toBe(true);
+          expect(await answers(handle.url)).toBe(true);
           expect(cleared).toEqual([]);
         } finally {
           release();
@@ -330,9 +390,9 @@ describe('startService', () => {
           clearInterval: () => {},
         };
 
-        const { chassisServers } = await start({ backup: { db: scratch, outDir: tmpdir(), timers, logger } });
+        const { handle } = await start({ backup: { db: scratch, outDir: tmpdir(), timers, logger } });
 
-        expect(chassisServers[0]?.listening).toBe(true);
+        expect(await answers(handle.url)).toBe(true);
         const failure = () => records.find((record) => record.step === 'startBackups');
         await until(() => failure() !== undefined);
         expect(failure()).toMatchObject({ domain: 'Server', scope: 'start', step: 'startBackups', reason: 'TypeError', level: 'error' });

@@ -2,6 +2,8 @@ import type { Db } from '../../src/data/repositories/db.ts';
 import type { McpTransport } from '../../src/mcp/transport.ts';
 import type { NotebookStartup } from '../../src/notebook/startup.ts';
 
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
@@ -21,40 +23,65 @@ const ping = defineTool({
   run: async () => ({ ok: true }),
 });
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+const logs = defineTool({
+  name: 'logs',
+  title: 'Logs',
+  description: 'Logs one line.',
+  input: z.strictObject({}),
+  run: async (_args, { log }) => {
+    log.info({ step: 'probe' }, 'tool line');
+    return 'ok';
+  },
+});
+
 const NOTEBOOK: NotebookStartup = { tools: [], message: 'notebook tools off: made up for this test' };
 
-/** Runs the setup on a bare server, returning what it logged and what it wrote to stderr. */
+/** Runs the setup on a bare server, returning what it logged. */
 function runSetup(transport: McpTransport, notebook: NotebookStartup | undefined) {
   const captured = captureLog();
-  const written: string[] = [];
   setupMcp(new McpServer({ name: 'test', version: '0.0.0' }), {
     db: stubDb,
     tools: [ping],
     notebook,
     transport,
     log: captured.log,
-    writeStderr: (text) => void written.push(text),
   });
-  return { records: captured.records, written };
+  return { records: captured.records };
 }
 
 describe('setupMcp', () => {
   test('over HTTP, logs the tool count and the notebook message as Mcp:start', () => {
-    const { records, written } = runSetup('http', NOTEBOOK);
+    const { records } = runSetup('http', NOTEBOOK);
 
     expect(records).toEqual([
       { domain: 'Mcp', scope: 'start', step: 'register', tools: 1, level: 'info', msg: 'registered MCP tools' },
       { domain: 'Mcp', scope: 'start', step: 'addNotebook', notebookTools: 0, level: 'info', msg: NOTEBOOK.message },
     ]);
-    expect(written).toEqual([]);
   });
 
-  test('on stdio, logs nothing and writes the count and the message to stderr', () => {
-    const { records, written } = runSetup('stdio', NOTEBOOK);
+  test('on stdio, logs the same Mcp:start lines on the log it is given, which writes to stderr there', () => {
+    const { records } = runSetup('stdio', NOTEBOOK);
 
-    // The control for the test above: the same setup, on the same fake, writes no record here
-    expect(records).toEqual([]);
-    expect(written).toEqual(['registered 1 MCP tools\n', `${NOTEBOOK.message}\n`]);
+    expect(records).toEqual([
+      { domain: 'Mcp', scope: 'start', step: 'register', tools: 1, level: 'info', msg: 'registered MCP tools' },
+      { domain: 'Mcp', scope: 'start', step: 'addNotebook', notebookTools: 0, level: 'info', msg: NOTEBOOK.message },
+    ]);
+  });
+
+  test.each(['stdio', 'http'] as const)('on %s, a tool call logs on the log it is given, under the call\'s own traceId', async (transport) => {
+    const captured = captureLog();
+    const server = new McpServer({ name: 'test', version: '0.0.0' });
+    setupMcp(server, { db: stubDb, tools: [logs], notebook: undefined, transport, log: captured.log });
+    const client = new Client({ name: 'test-client', version: '0.0.0' });
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+
+    await client.callTool({ name: 'logs', arguments: {} });
+
+    const line = captured.records.find((record) => record.msg === 'tool line');
+    expect(line).toMatchObject({ step: 'probe', level: 'info', traceId: expect.stringMatching(UUID) });
   });
 
   test('with no notebook probe, logs the count alone', () => {

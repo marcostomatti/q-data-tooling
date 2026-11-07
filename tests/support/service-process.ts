@@ -12,48 +12,22 @@
 
 import type { StartOptions } from '../../src/http/server.ts';
 import type { ServiceHandle } from '@open-tomato/service-express';
-import type { Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
-
-import express from 'express';
 
 import { closeDb } from '../../src/data/active.ts';
 import { migrateActive } from '../../src/data/migrate.ts';
 import { MEMORY_DATABASE } from '../../src/data/sqlite/client.ts';
 import { startService } from '../../src/http/server.ts';
 
-/** What `startService` returned, beside every server `app.listen` created while it ran. */
-export interface CapturedStart {
-  readonly handle: ServiceHandle
-  /** Every server `app.listen` created during the start: the chassis's own is the first. */
-  readonly servers: readonly Server[]
-}
-
 /**
- * Runs `startService` with `express.application.listen` patched to collect the servers it
- * creates, because the `ServiceHandle` the chassis returns carries no server and no address.
- * Under `NODE_ENV=test` the chassis binds an ephemeral port, and the collected server tells which.
+ * Runs `startService` in a test. Under `NODE_ENV=test`, with neither a port option nor `PORT`,
+ * the chassis binds a port the OS picks, and the handle's `port` and `url` name it.
  *
  * @param opts - Passed to `startService` as they are.
  * @throws {Error} when `NODE_ENV` is not `test`, where the chassis would bind a fixed port.
  */
-export async function startCapturingServers(opts?: StartOptions): Promise<CapturedStart> {
+export async function startInTest(opts?: StartOptions): Promise<ServiceHandle> {
   if (process.env.NODE_ENV !== 'test') throw new Error('starting the service in a test needs NODE_ENV=test');
-  const servers: Server[] = [];
-  const original = express.application.listen;
-  // Patched by hand and not with spyOn: express copies `listen` onto each app it makes, so the
-  // copy outlives the patch and a spy's restore would reset the very function the app holds.
-  express.application.listen = function (this: unknown, ...args: unknown[]): Server {
-    const server = (original as (...a: unknown[]) => Server).apply(this, args);
-    servers.push(server);
-    return server;
-  } as typeof original;
-  try {
-    const handle = await startService(opts);
-    return { handle, servers };
-  } finally {
-    express.application.listen = original;
-  }
+  return startService(opts);
 }
 
 /**
@@ -76,11 +50,12 @@ export interface ServiceProcess {
 }
 
 /**
- * Set unless the caller names its own: the service's loggers read `LOG_LEVEL` when they are
- * made, and a test reads none of what they write. The chassis's request logger has no level
- * setting and still logs each request.
+ * Set unless the caller names its own. The service's loggers, the chassis's request logger among
+ * them, read `LOG_LEVEL` when they are made, and a test reads none of what they write. `PORT` and
+ * `PORT_STRICT` are unset so a developer's `.env`, which `bun test` loads, cannot move the run off
+ * the port the OS picks or make a taken port an error.
  */
-const DEFAULT_ENV: ServiceEnv = { LOG_LEVEL: 'silent' };
+const DEFAULT_ENV: ServiceEnv = { LOG_LEVEL: 'silent', PORT: undefined, PORT_STRICT: undefined };
 
 /** Whether a run is live: the active database is one per process, so two runs would share it. */
 let running = false;
@@ -101,14 +76,6 @@ function restoreEnv(saved: SavedEnv): void {
 function setVariable(name: string, value: string | undefined): void {
   if (value === undefined) delete process.env[name];
   else process.env[name] = value;
-}
-
-function originOf(server: Server | undefined): string {
-  const address = server?.address();
-  if (address === null || address === undefined || typeof address === 'string') {
-    throw new Error('the service started but its server reports no port');
-  }
-  return `http://localhost:${(address satisfies AddressInfo).port}`;
 }
 
 /**
@@ -136,16 +103,13 @@ export async function startServiceProcess(env: ServiceEnv = {}, opts?: StartOpti
   };
 
   let handle: ServiceHandle;
-  let origin: string;
   try {
     // Whatever was open before read another DATABASE_URL: closing it makes the next open read ours.
     await closeDb();
     // `startService` does not migrate; the routes and the sign-in read tables, so this run's
     // database gets every migration first, on the very connection the service then opens.
     await migrateActive();
-    const started = await startCapturingServers(opts);
-    handle = started.handle;
-    origin = originOf(started.servers[0]);
+    handle = await startInTest(opts);
   } catch (error: unknown) {
     await release();
     throw error;
@@ -160,7 +124,7 @@ export async function startServiceProcess(env: ServiceEnv = {}, opts?: StartOpti
     }
   };
   return {
-    origin,
+    origin: handle.url,
     handle,
     stop: () => (stopping ??= finish()),
   };

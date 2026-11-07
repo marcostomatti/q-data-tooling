@@ -131,11 +131,15 @@ ignores the file. Two notes apply to the whole table:
 | `OIDC_ALLOWED_SUBJECT` | unset | The one subject allowed in. Set this or `OIDC_ALLOWED_EMAIL`, or the start is refused. | `src/auth/config.ts` |
 | `OIDC_ALLOWED_EMAIL` | unset | The one email allowed in, matched only when the provider marks it verified. | `src/auth/config.ts` |
 | `OIDC_SCOPES` | `openid email` | Space-separated scopes. `openid` is added when it is missing. | `src/auth/config.ts` |
-| `PORT` | `3000` for `serve`, `8080` for MCP over HTTP | The port `serve` listens on, and the port of the MCP HTTP transport. A whole number from 1 to 65535. | `src/http/server.ts`, the service-mcp package |
+| `PORT` | `3000` for `serve`, `8080` for MCP over HTTP | The port `serve` listens on, and the port of the MCP HTTP transport. A whole number from 1 to 65535. A taken port falls back to the next free one unless `PORT_STRICT` is set. | `src/http/server.ts`, the service-mcp package |
+| `PORT_STRICT` | unset | `true` stops the start with an error naming the port when it is taken. Unset, a taken port falls back to the next free one with a warning. | the service-express package, the service-mcp package |
+| `HEALTH_PORT` | `3001` | The port of the health endpoint the MCP server starts over HTTP. A whole number. `PORT` does not move it. | the service-mcp package |
+| `HEALTH_PORT_STRICT` | unset | `true` stops the MCP server when the health port is taken. Unset, it falls back to the next free one with a warning. | the service-mcp package |
 | `MCP_TRANSPORT` | unset, stdio | `stdio` or unset for stdio. Only the exact value `http` opts in to HTTP. Any other value exits 1 at start. | `src/mcp/transport.ts`, `src/mcp/server.ts` |
-| `LOG_LEVEL` | `info` | The lowest level written: `trace`, `debug`, `info`, `warn`, `error`, `fatal` or `silent`. | `src/logging.ts`, the service-express package |
+| `LOG_LEVEL` | `info` | The lowest level written: `trace`, `debug`, `info`, `warn`, `error`, `fatal` or `silent`. | the service-logger package |
+| `LOG_FORMAT` | unset | `terminal` for one readable line per record, `json` for pino's JSON line. Unset picks `terminal` when the output is a terminal and `json` when it is not. | the service-logger package |
 | `LOG_REDACT` | unset | A comma-separated list of log fields to redact. | the service-logger package |
-| `NODE_ENV` | unset | `test` makes `serve` bind an ephemeral port and start no backup schedule, unless one is passed in. | `src/http/server.ts` |
+| `NODE_ENV` | unset | `test` makes `serve` bind a port the OS picks when neither the port option nor `PORT` names one, and start no backup schedule unless one is passed in. | `src/http/server.ts`, the service-express package |
 | `OPEN_NOTEBOOK_URL` | unset, notebook tools off | The notebook's address, `http://` or `https://`, with no user or password in it. When the notebook answers at start, eight `notebook_*` tools are added. | `src/notebook/config.ts`, `src/notebook/startup.ts` |
 | `OPEN_NOTEBOOK_API_KEY` | unset | The notebook's password, sent to it as a bearer token. Unset for a notebook with no password. | `src/notebook/config.ts`, `docker-compose.notebook.yaml` |
 | `OPEN_NOTEBOOK_ENCRYPTION_KEY` | `change-me-template-service` | Compose only. The key that encrypts the provider keys the notebook stores. Set your own. | `docker-compose.notebook.yaml` |

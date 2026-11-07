@@ -308,6 +308,49 @@ describe('jsonHandler trace id', () => {
     expect(tracedIds()).toEqual([kept, overLimit.requestId]);
   });
 
+  /**
+   * Calls a probe handler directly with `request`, which can carry a `req.id` as it does behind
+   * the chassis, the id the chassis picks before any route runs. Returns the `x-request-id` answered.
+   */
+  async function answeredDirectly(request: Readonly<Record<string, unknown>>): Promise<string | undefined> {
+    let answered: string | undefined;
+    const response = {
+      setHeader: (name: string, value: string) => {
+        if (name === 'x-request-id') answered = value;
+        return response;
+      },
+      status: () => response,
+      json: () => response,
+    };
+    const handler = jsonHandler(LabelSchema, async ({ label }, context) => {
+      context.log.debug({ step: 'probe', label }, 'probed');
+    }, db, log);
+    const next: NextFunction = () => undefined;
+    await (handler as (req: Request, res: Response, next: NextFunction) => Promise<void>)(
+      { params: {}, query: {}, body: { label: 'traced' }, ...request } as unknown as Request,
+      response as unknown as Response,
+      next,
+    );
+    return answered;
+  }
+
+  test('a request the chassis already traced keeps the chassis\'s id, answered as the header and bound on the line', async () => {
+    const answered = await answeredDirectly({ id: 'chassis-trace-1', headers: {} });
+
+    expect(answered).toBe('chassis-trace-1');
+    expect(tracedIds()).toEqual(['chassis-trace-1']);
+  });
+
+  test.each([
+    ['a number', 42],
+    ['a string holding a newline', 'chassis\ntrace'],
+  ])('a chassis id that is %s is not adopted, and the header\'s id is used instead', async (_kind, id) => {
+    const answered = await answeredDirectly({ id, headers: { 'x-request-id': 'from-header-1' } });
+
+    expect(answered).toBe('from-header-1');
+    expect(tracedIds()).toEqual(['from-header-1']);
+  });
+
   test('an id holding a newline is replaced by a new UUID and never reaches the log', async () => {
     // No HTTP client or parser carries a newline in a header value (fetch throws, and Node's
     // parser answers 400), so the handler is called directly with the value a lenient proxy

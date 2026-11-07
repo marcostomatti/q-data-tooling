@@ -3,6 +3,7 @@ import type { Request, RequestHandler, Response } from 'express';
 
 import { randomUUID } from 'node:crypto';
 
+import { isTraceId } from '@open-tomato/service';
 import { z, ZodError, type ZodType } from 'zod';
 
 import { describeError, statusFor } from '../errors.ts';
@@ -14,12 +15,6 @@ const STATUS_INTERNAL = 500;
 
 /** The request and response header that carries a request's trace id. */
 export const REQUEST_ID_HEADER = 'x-request-id';
-
-/**
- * A trace id a caller may choose: 1 to 64 characters from `[A-Za-z0-9._:-]`, so a header cannot
- * write a control character or a long string into the logs.
- */
-const ACCEPTED_REQUEST_ID = /^[A-Za-z0-9._:-]{1,64}$/;
 
 /** The name a caller sees on a refused request, which says the input was at fault. */
 const VALIDATION_ERROR_NAME = 'ValidationError';
@@ -126,21 +121,28 @@ function mergeInput(req: Request, withheld: ReadonlySet<string>): Record<string,
 }
 
 /**
- * The trace id of a request: its `x-request-id` when that is one `ACCEPTED_REQUEST_ID` takes,
- * otherwise a new UUID. A header sent more than once arrives joined by `, `, which is refused.
+ * The trace id of a request: its `x-request-id` when the core's `isTraceId` takes it, 1 to 64
+ * characters from `[A-Za-z0-9._:-]` so a header cannot write a control character or a long string
+ * into the logs, otherwise a new UUID. A header sent more than once arrives joined by `, `, which
+ * is refused. The chassis picks its `req.id` by the same rule, so the two cannot drift.
  */
 export function traceIdFor(header: unknown): string {
-  return typeof header === 'string' && ACCEPTED_REQUEST_ID.test(header)
+  return isTraceId(header)
     ? header
     : randomUUID();
 }
 
 /**
- * Picks a request's trace id with `traceIdFor` and answers it in the response's `x-request-id`,
- * so a caller can quote the id its lines carry. Returns the id, for the request's log to bind.
+ * The request's trace id, answered in the response's `x-request-id` so a caller can quote the id
+ * its lines carry. Behind the chassis that is the id the chassis already picked by the same rule,
+ * `req.id`, which its `request completed` line carries too; without the chassis (a route test on
+ * a bare app) it is `traceIdFor` over the header. Returns the id, for the request's log to bind.
  */
 export function answerTraceId(req: Request, res: Response): string {
-  const traceId = traceIdFor(req.headers[REQUEST_ID_HEADER]);
+  const chassisId: unknown = req.id;
+  const traceId = isTraceId(chassisId)
+    ? chassisId
+    : traceIdFor(req.headers[REQUEST_ID_HEADER]);
   res.setHeader(REQUEST_ID_HEADER, traceId);
   return traceId;
 }
@@ -163,8 +165,9 @@ function parsePathOnly<P extends PathOnlySchemas>(req: Request, schemas: P | und
  * `ZodError` as internal because the SDK has already validated: here this function is the
  * validator, so a `ZodError` from the parse is the caller's.
  *
- * Every request gets a trace id from `traceIdFor` over its `x-request-id`, and the response
- * answers it in `x-request-id`, on success, 400 and 500 alike, so a caller can quote it.
+ * Every request gets a trace id from `answerTraceId`, the chassis's `req.id` or else its
+ * `x-request-id`, and the response answers it in `x-request-id`, on success, 400 and 500 alike,
+ * so a caller can quote it.
  *
  * `run` receives one context object, `{ db, log, pathOnly }`. `db` is a parameter so that `run`
  * holds no way to obtain a database of its own and a test can hand it any. `log` is a child of the

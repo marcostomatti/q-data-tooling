@@ -14,9 +14,6 @@ import { dbDependency, getDb } from '../data/active.ts';
 import { inDomain, lazyLogger, scoped, type Log } from '../logging.ts';
 import { mountRoutes } from '../routes/http.ts';
 
-/** The port used when neither the caller nor `PORT` names one. The MCP server's HTTP mode takes 8080 and 3001. */
-const DEFAULT_PORT = 3000;
-
 const MAX_PORT = 65_535;
 
 /** The domain the service's start lines carry; each is written under scope `start`. */
@@ -40,7 +37,11 @@ const DEFAULT_WEB_DIST = resolve(import.meta.dir, '../web/dist');
 export const APP_PATHS = ['/', '/login', APP.landing.path, '/tokens'];
 
 export interface StartOptions {
-  /** The port to listen on. Defaults to `PORT`, then 3000. Ignored under `NODE_ENV=test`, which binds an ephemeral one. */
+  /**
+   * The port to listen on. Defaults to `PORT`, then the chassis's 3000; under `NODE_ENV=test`
+   * with neither set, the chassis binds a port the OS picks. A taken port falls back to the next
+   * free one with a warning. The MCP server's HTTP mode takes 8080 and 3001.
+   */
   readonly port?: number
   /** The directory holding the built web app. Defaults to `src/web/dist`; nothing is served when it does not exist. */
   readonly webDist?: string
@@ -91,11 +92,14 @@ function assertPort(port: number, what: string): number {
   return port;
 }
 
-/** The port from the caller, else `PORT`, else the default; a port that is not a port number is refused. */
-function resolvePort(requested: number | undefined, env: NodeJS.ProcessEnv): number {
+/**
+ * The port from the caller, else `PORT`, else undefined for the chassis to pick; a port that is
+ * not a port number is refused before anything opens.
+ */
+function resolvePort(requested: number | undefined, env: NodeJS.ProcessEnv): number | undefined {
   if (requested !== undefined) return assertPort(requested, 'the port option');
   const raw = env.PORT;
-  if (raw === undefined || raw === '') return DEFAULT_PORT;
+  if (raw === undefined || raw === '') return undefined;
   return assertPort(Number(raw), 'PORT');
 }
 
@@ -159,7 +163,9 @@ export async function startService(opts: StartOptions = {}): Promise<ServiceHand
 
   const service = await createService({
     serviceId: APP.id,
-    port,
+    ...(port === undefined
+      ? {}
+      : { port }),
     rateLimit: RATE_LIMIT,
     dependencies: [dbDependency(db)],
     register: (app, { logger }) => {

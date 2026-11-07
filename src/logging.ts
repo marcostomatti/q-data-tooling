@@ -8,8 +8,9 @@
  * `traceId`. Only those four fields are ever bound on a child; the data of a call goes in that
  * call's context object, never in bindings.
  *
- * `lazyLogger` writes to stdout; `stderrLogger` writes the same shape to stderr, for code that may
- * run as the stdio MCP server, whose stdout carries the protocol.
+ * `lazyLogger` writes to stdout. The stdio MCP server's lines go through the package's logger,
+ * which writes to stderr there, since its stdout carries the protocol. So code a tool runs logs on
+ * the `log` it is handed, never on a `lazyLogger`, whose stdout line would land in the protocol.
  *
  * @module
  */
@@ -58,72 +59,6 @@ export function inDomain(log: Log, domain: string): Log {
 /** A child of `log` whose every line carries `scope`, replacing a scope bound above it. */
 export function scoped(log: Log, scope: string): Log {
   return log.child({ [SCOPE_FIELD]: scope });
-}
-
-/** pino's numbers for the level names `LOG_LEVEL` takes, so a stderr line reads like a pino one. */
-const LEVEL_VALUES = {
-  trace: 10,
-  debug: 20,
-  info: 30,
-  warn: 40,
-  error: 50,
-  fatal: 60,
-  silent: Number.POSITIVE_INFINITY,
-} as const;
-
-/** The level a name outside `LEVEL_VALUES` falls back to, pino's own default. */
-const DEFAULT_LEVEL = 'info';
-
-/** The number of a level name, or of `DEFAULT_LEVEL` when the name is not one. */
-function levelValue(name: string): number {
-  return name in LEVEL_VALUES
-    ? LEVEL_VALUES[name as keyof typeof LEVEL_VALUES]
-    : LEVEL_VALUES[DEFAULT_LEVEL];
-}
-
-/** What a stderr logger is built from; a test passes its own `write` and `level`. */
-export type StderrLoggerOptions = {
-  readonly write?: (line: string) => void
-  readonly level?: string
-};
-
-/** An `Error` as pino's `err` serializer writes it, since `JSON.stringify` drops its fields. */
-function serializeValue(_key: string, value: unknown): unknown {
-  if (!(value instanceof Error)) return value;
-  return { type: value.name, message: value.message, stack: value.stack };
-}
-
-/**
- * A `Log` that writes one pino-shaped JSON line per call to stderr, honouring `LOG_LEVEL` as
- * pino does. It is the logger for code that may run as the stdio MCP server, where stdout
- * carries the protocol and a `lazyLogger` line there would corrupt the stream. A line whose
- * context cannot be serialized is written with its message and level only.
- */
-export function stderrLogger(name: string, options: StderrLoggerOptions = {}): Log {
-  const write = options.write ?? ((line: string) => void process.stderr.write(line));
-  const threshold = levelValue(options.level ?? process.env['LOG_LEVEL'] ?? DEFAULT_LEVEL);
-  const build = (bindings: object): Log => {
-    const at = (level: number) => (context: object, message: string): void => {
-      if (level < threshold) return;
-      const head = { level, time: Date.now(), service: name };
-      let line: string;
-      try {
-        line = JSON.stringify({ ...head, ...bindings, ...context, msg: message }, serializeValue);
-      } catch {
-        line = JSON.stringify({ ...head, msg: message });
-      }
-      write(`${line}\n`);
-    };
-    return {
-      trace: at(LEVEL_VALUES.trace),
-      debug: at(LEVEL_VALUES.debug),
-      info: at(LEVEL_VALUES.info),
-      warn: at(LEVEL_VALUES.warn),
-      error: at(LEVEL_VALUES.error),
-      child: (more) => build({ ...bindings, ...more }),
-    };
-  };
-  return build({});
 }
 
 /**

@@ -33,7 +33,6 @@ createMCP({
       // Undefined only once `applyTransport` has exited the process; the package reads it as HTTP.
       transport: transport ?? 'http',
       log: logger,
-      writeStderr: (text) => void process.stderr.write(text),
     });
   },
 });

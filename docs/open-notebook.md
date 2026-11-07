@@ -77,8 +77,8 @@ is still one search away.
 
 With `OPEN_NOTEBOOK_URL` set, the MCP server asks the notebook for one authenticated read when it
 starts. If the notebook answers, eight tools are added; if it is not set, unreachable, or refuses
-the key, none is added and the server writes one line to stderr saying why, such as `notebook tools
-off: OPEN_NOTEBOOK_URL is not set`. The line never holds the URL or the key.
+the key, none is added and the server logs one line saying why, such as `notebook tools off:
+OPEN_NOTEBOOK_URL is not set`, on stderr over stdio. The line never holds the URL or the key.
 
 | Tool | What it does |
 |---|---|
@@ -197,10 +197,10 @@ input:
 printf '' | bun run mcp
 ```
 
-It exits as soon as the input ends. On stderr it prints `notebook tools on: 8 Open Notebook tools`,
-which means the startup read reached the notebook and the key was accepted. A line that starts with
-`notebook tools off:` names the reason instead; the [troubleshooting](#troubleshooting) section
-lists them.
+It exits as soon as the input ends. On stderr it logs `notebook tools on: 8 Open Notebook tools`
+as the message of an `info` line, which means the startup read reached the notebook and the key
+was accepted. A line whose message starts with `notebook tools off:` names the reason instead; the
+[troubleshooting](#troubleshooting) section lists them.
 
 ## Turn it off
 
@@ -224,8 +224,8 @@ The service's own database is not touched by either command.
 
 ## Troubleshooting
 
-Each message is quoted as the code prints it. The first group comes at start, on stderr, and the
-last group comes back in a tool result.
+Each message is quoted as the code writes it. The first group is logged at start, each as the
+message of one log line, on stderr over stdio. The last group comes back in a tool result.
 
 When no notebook is configured, the server starts with the tools off:
 
