@@ -8,7 +8,6 @@ import layerImports, { layerOf, roleOf } from '../../eslint/rules/layer-imports.
 
 RuleTester.describe = describe;
 RuleTester.it = it;
-RuleTester.itOnly = it.only;
 
 const REPO_ROOT = join(import.meta.dir, '..', '..');
 

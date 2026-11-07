@@ -8,7 +8,6 @@ import noDrizzleTransaction, { covers, TRANSACTION_CALL_ALLOWED } from '../../es
 
 RuleTester.describe = describe;
 RuleTester.it = it;
-RuleTester.itOnly = it.only;
 
 const REPO_ROOT = join(import.meta.dir, '..', '..');
 
