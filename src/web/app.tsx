@@ -8,7 +8,6 @@ import {
   AppShellSidebar,
   AppShellTopbar,
   Button,
-  Content,
   Monogram,
   SidebarNav,
 } from '@open-tomato/components';
@@ -58,6 +57,21 @@ function usePath(): string {
   return path;
 }
 
+/**
+ * The shell's own classes. The library's `AppShell` story draws its brand row, wordmark, topbar
+ * title and spacer with story-only classes the library does not export, so the shell carries
+ * the same ones here. The brand row is as tall as the topbar (`h-[60px]`) with the same divider,
+ * so the two line up across the frame.
+ */
+const SHELL_CLASSES = {
+  brandRow: 'flex h-[60px] shrink-0 items-center gap-2.5 border-b border-border-soft',
+  brandRowOpen: 'justify-start px-[18px]',
+  brandRowCollapsed: 'justify-center p-0',
+  wordmark: 'font-display text-[17px] font-bold tracking-[-0.02em] text-fg1',
+  title: 'font-display text-lg font-bold tracking-[-0.015em] text-fg1',
+  spacer: 'flex-1',
+} as const;
+
 /** The props of {@link Shell}: the page on show, its content, and the actions the frame offers. */
 export interface ShellProps {
   /** The page on show; its nav entry carries `aria-current="page"` and its label heads the topbar. */
@@ -80,10 +94,14 @@ export function Shell({ current, onSignOut, onNavigate = navigate, children }: S
   return (
     <AppShell>
       <AppShellSidebar collapsed={collapsed}>
-        <Content direction="row" align="center" gap="sm">
+        <div
+          className={`${SHELL_CLASSES.brandRow} ${collapsed
+            ? SHELL_CLASSES.brandRowCollapsed
+            : SHELL_CLASSES.brandRowOpen}`}
+        >
           <Monogram name={APP.name} tone="primary" size="sm" />
-          {!collapsed && <span>{APP.name}</span>}
-        </Content>
+          {!collapsed && <span className={SHELL_CLASSES.wordmark}>{APP.name}</span>}
+        </div>
         <SidebarNav
           items={PAGES.map((page) => ({ id: page.path, label: page.label, icon: page.icon }))}
           activeId={current.path}
@@ -96,7 +114,8 @@ export function Shell({ current, onSignOut, onNavigate = navigate, children }: S
           sidebarCollapsed={collapsed}
           onToggleSidebar={() => setCollapsed((was) => !was)}
         >
-          <span>{current.label}</span>
+          <span className={SHELL_CLASSES.title}>{current.label}</span>
+          <div className={SHELL_CLASSES.spacer} />
           <Button variant="ghost" size="sm" onClick={onSignOut}>
             Sign out
           </Button>

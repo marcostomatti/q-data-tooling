@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 
@@ -9,6 +11,9 @@ import { LoginPage, LoginView } from '../../src/web/pages/login.tsx';
 import { TOKENS_EMPTY_TITLE, TokensPage, TokensView } from '../../src/web/pages/tokens.tsx';
 
 const noop = (): void => {};
+
+/** The web app's stylesheet, as the build reads it. */
+const STYLES = readFileSync(new URL('../../src/web/styles.css', import.meta.url), 'utf8');
 
 function renderShell(path: string): string {
   return renderToStaticMarkup(
@@ -52,9 +57,39 @@ describe('Shell', () => {
     const html = renderShell('/tokens');
 
     expect(html).toContain(`aria-label="${APP.name}"`);
-    expect(html).toMatch(/<header[^>]*>.*<span>Tokens<\/span>.*<\/header>/);
+    expect(html).toMatch(/<header[^>]*>.*<span[^>]*>Tokens<\/span>.*<\/header>/);
     expect(html).toMatch(/<button[^>]*>Sign out<\/button>/);
     expect(html).toContain('<p>page body</p>');
+  });
+});
+
+/** The class list of the first element the pattern's group captures, split into names. */
+function classesOf(html: string, pattern: RegExp): string[] {
+  return (html.match(pattern)?.[1] ?? '').split(' ');
+}
+
+describe('Shell layout', () => {
+  test('sizes html, body and #root to the viewport, since AppShell only fills the box its parent gives it', () => {
+    const rule = STYLES.match(/[^{}]*\{[^}]*\}/g)?.find((block) => block.includes('#root')) ?? '';
+
+    expect(rule).toMatch(/\bhtml\b/);
+    expect(rule).toMatch(/\bbody\b/);
+    expect(rule).toMatch(/height:\s*100%/);
+  });
+
+  test('puts the brand in a row as tall as the topbar, so their dividers line up', () => {
+    const html = renderShell('/');
+    const brandRow = classesOf(html, /<aside[^>]*><div class="([^"]*)"/);
+    const topbar = classesOf(html, /<header class="([^"]*)"/);
+
+    for (const name of ['h-[60px]', 'border-b']) {
+      expect(brandRow).toContain(name);
+      expect(topbar).toContain(name);
+    }
+  });
+
+  test('pushes the sign-out action to the far end of the topbar', () => {
+    expect(renderShell('/')).toMatch(/<div class="flex-1"><\/div><button[^>]*>Sign out<\/button>/);
   });
 });
 
