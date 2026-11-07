@@ -1,0 +1,12 @@
+{
+  // `bun run typecheck:pg`: the whole tree checked with the Postgres folder as the active dialect,
+  // so the dialect package.json's `#db` alias does not name still has to compile. The `paths`
+  // entry takes precedence over the package.json `imports` entry; nothing else differs from
+  // tsconfig.json, whose `exclude` this inherits.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "#db": ["./src/data/pg/index.ts"]
+    }
+  }
+}

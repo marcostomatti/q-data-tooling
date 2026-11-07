@@ -1,0 +1,31 @@
+# >>> rafa tracking: rafa rewrites the lines up to the end marker
+.rafa/
+# <<< rafa tracking
+node_modules/
+.docs/
+.temp/
+# Scratch output, such as a public export written for the privacy check to read whole.
+.tmp/
+.env
+.env.*
+!.env.example
+
+# Personal variants of Claude skills: your own settings and preferences stay local.
+.claude/skills/personal-*/
+
+# Database dumps are the personal data this project exists to keep out of the repository.
+backups/
+*.dump
+*.dump.partial
+
+# subagent-driven-development workspace: briefs, reports, review packages
+.superpowers/
+
+# The built web app; `bun run build:web` makes it.
+src/web/dist/
+
+# The SQLite database `DATABASE_URL` falls back to (./data/app.db) holds personal data too.
+/data/
+
+# The loop ledger: each loop writes it beside the plan; it is not part of the template.
+progress.txt

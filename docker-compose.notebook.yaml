@@ -1,0 +1,62 @@
+# Open Notebook and its SurrealDB, an optional companion (docs/open-notebook.md). Nothing in the
+# service needs it. Start it on its own with:
+#
+#   docker compose -f docker-compose.notebook.yaml up -d
+#
+# Adapted from upstream's compose file (github.com/lfnovo/open-notebook): every port is bound to
+# 127.0.0.1, nothing restarts on its own, and the data lives in named volumes. Every credential
+# below is a default for a local setup; override it in .env, which compose reads from this
+# directory and git ignores.
+# Pinned so the volumes are always template-service-notebook_template-service-notebook-data and
+# template-service-notebook_template-service-surreal-data, whatever the clone's directory is called.
+name: template-service-notebook
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:v2
+    # List form, so a password with spaces stays one argument.
+    command:
+      [
+        'start',
+        '--log',
+        'info',
+        '--user',
+        '${SURREAL_USER:-root}',
+        '--pass',
+        '${SURREAL_PASSWORD:-root}',
+        'rocksdb:/mydata/mydatabase.db',
+      ]
+    # The image's own user cannot write to a fresh volume.
+    user: root
+    restart: 'no'
+    ports:
+      # Only for local debugging; open-notebook reaches it over the compose network.
+      - '127.0.0.1:${SURREAL_PORT:-8000}:8000'
+    volumes:
+      - template-service-surreal-data:/mydata
+
+  open-notebook:
+    image: lfnovo/open_notebook:v1-latest
+    restart: 'no'
+    depends_on:
+      - surrealdb
+    ports:
+      - '127.0.0.1:${OPEN_NOTEBOOK_UI_PORT:-8502}:8502'
+      - '127.0.0.1:${OPEN_NOTEBOOK_API_PORT:-5055}:5055'
+    environment:
+      # Encrypts the provider keys the notebook stores. Set your own in .env.
+      OPEN_NOTEBOOK_ENCRYPTION_KEY: ${OPEN_NOTEBOOK_ENCRYPTION_KEY:-change-me-template-service}
+      # The same value the service's MCP tools send as their bearer token, so the two cannot
+      # drift. Empty (the default) leaves the notebook without a password.
+      OPEN_NOTEBOOK_PASSWORD: ${OPEN_NOTEBOOK_API_KEY:-}
+      SURREAL_URL: ws://surrealdb:8000/rpc
+      SURREAL_USER: ${SURREAL_USER:-root}
+      SURREAL_PASSWORD: ${SURREAL_PASSWORD:-root}
+      SURREAL_NAMESPACE: template_service
+      SURREAL_DATABASE: template_service
+    volumes:
+      - template-service-notebook-data:/app/data
+
+volumes:
+  template-service-surreal-data:
+  template-service-notebook-data:
