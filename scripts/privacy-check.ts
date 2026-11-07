@@ -24,8 +24,12 @@
  * - `allow<TAB>phrase`: one exact phrase, taken out of a line before the `word:` rules read it,
  *   so the phrase is no hit and the same word elsewhere on the line still is.
  *
- * Usage: bun <this file> <dir> [--denylist <file>] [--reviewed <file>] [--no-gitleaks]
- * (or PRIVACY_DENYLIST=<file>)
+ * gitleaks reads its rules from `<dir>/.gitleaks.toml` when the folder holds one. `--gitleaks-config
+ * <file>` names the config instead, for a folder that holds only some of a repository's files, such
+ * as one commit's changes in `scripts/privacy-history.sh`.
+ *
+ * Usage: bun <this file> <dir> [--denylist <file>] [--reviewed <file>] [--gitleaks-config <file>]
+ * [--no-gitleaks] (or PRIVACY_DENYLIST=<file>)
  * Exit: 0 nothing found, 1 findings, 2 the scan could not run, which includes gitleaks missing
  * from `PATH` without `--no-gitleaks`. Under `--no-gitleaks` the last line printed is `gitleaks
  * did not run`, so a scan without it never reads as a whole one.
@@ -397,21 +401,25 @@ export async function scanDir(
 
 type GitleaksHit = { readonly File: string; readonly StartLine: number; readonly RuleID: string };
 
-function gitleaks(dir: string): readonly Finding[] {
+/** gitleaks over the folder, with the config named, or else the one the folder holds. */
+function gitleaks(dir: string, config: string | undefined): readonly Finding[] {
   const reportDir = mkdtempSync(join(tmpdir(), 'gitleaks-'));
   const report = join(reportDir, 'report.json');
   try {
-    return gitleaksInto(dir, report);
+    return gitleaksInto(dir, report, config);
   } finally {
     rmSync(reportDir, { recursive: true, force: true });
   }
 }
 
-function gitleaksInto(dir: string, report: string): readonly Finding[] {
+function gitleaksInto(dir: string, report: string, config: string | undefined): readonly Finding[] {
+  const configArgs = config === undefined
+    ? []
+    : ['--config', config];
   const run = Bun.spawnSync(
     [
       'gitleaks', 'dir', '--redact', '--no-banner', '--report-format', 'json', '--report-path', report,
-      '--exit-code', '0', dir,
+      '--exit-code', '0', ...configArgs, dir,
     ],
     { stdout: 'ignore', stderr: 'pipe' },
   );
@@ -431,6 +439,16 @@ export function denylistPath(args: readonly string[]): string | undefined {
   return path;
 }
 
+/** The file `--gitleaks-config` names, or undefined without the flag. */
+export function gitleaksConfigPath(args: readonly string[]): string | undefined {
+  const flag = args.indexOf('--gitleaks-config');
+  if (flag < 0) return undefined;
+  const path = args[flag + 1];
+  if (path === undefined || path === '') throw new Error('--gitleaks-config needs a file');
+  if (!existsSync(path)) throw new Error('the gitleaks config file named does not exist');
+  return path;
+}
+
 function reviewedList(dir: string, args: readonly string[]): Reviewed {
   const flag = args.indexOf('--reviewed');
   if (flag >= 0 && (args[flag + 1] === undefined || args[flag + 1] === '')) throw new Error('--reviewed needs a file');
@@ -446,7 +464,7 @@ async function scan(args: readonly string[], withGitleaks: boolean): Promise<num
   const dir = args[0];
   if (dir === undefined || !existsSync(dir) || !statSync(dir).isDirectory()) {
     const self = relative(process.cwd(), process.argv[1] ?? 'this file');
-    console.error(`usage: bun ${self} <dir> [--denylist <file>] [--reviewed <file>] [${NO_GITLEAKS}]`);
+    console.error(`usage: bun ${self} <dir> [--denylist <file>] [--reviewed <file>] [--gitleaks-config <file>] [${NO_GITLEAKS}]`);
     return EXIT_FAILED;
   }
   if (withGitleaks && Bun.which('gitleaks') === null) {
@@ -455,13 +473,14 @@ async function scan(args: readonly string[], withGitleaks: boolean): Promise<num
   }
   try {
     const listed = denylistPath(args);
+    const config = gitleaksConfigPath(args);
     const rules = [...GENERIC_RULES, ...(listed
       ? parseDenylist(readFileSync(listed, 'utf8'))
       : [])];
     const findings = [
       ...(await scanDir(dir, rules, reviewedList(dir, args))),
       ...(withGitleaks
-        ? gitleaks(dir)
+        ? gitleaks(dir, config)
         : []),
     ];
     const lines = findings.map((f) => `${f.file}:${f.line} ${f.rule}`).sort();

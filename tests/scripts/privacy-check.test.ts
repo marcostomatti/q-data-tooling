@@ -363,6 +363,19 @@ describe('the command', () => {
     expect(run([tempDir(), '--denylist', list]).exitCode).toBe(2);
   });
 
+  test('exits 2 naming the flag when --gitleaks-config has no file or names a missing one', () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, 'a.txt'), 'fine\n');
+
+    const bare = run([dir, '--gitleaks-config']);
+    const missing = run([dir, '--gitleaks-config', join(tempDir(), 'missing.toml')]);
+
+    expect(bare.exitCode).toBe(2);
+    expect(bare.stderr).toContain('--gitleaks-config needs a file');
+    expect(missing.exitCode).toBe(2);
+    expect(missing.stderr).toContain('the gitleaks config file named does not exist');
+  });
+
   test('exits 2 naming --no-gitleaks when gitleaks is missing from PATH, and 0 once it is there', () => {
     const dir = tempDir();
     writeFileSync(join(dir, 'a.txt'), 'host 192.0.2.9\n');

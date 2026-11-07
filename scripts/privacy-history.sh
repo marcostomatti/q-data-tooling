@@ -7,6 +7,9 @@
 # `commit <sha> message <label>`, once per label. Neither prints the text that matched. Under
 # --no-gitleaks the last line printed is `gitleaks did not run`.
 #
+# gitleaks reads its allowlists from the `.gitleaks.toml` each commit holds, passed as its config,
+# since the folder of a commit's changes holds that file only when the commit changed it.
+#
 # Usage: bash scripts/privacy-history.sh <range> [--denylist <file>] [--no-gitleaks]
 #   <range> such as origin/main..HEAD, or HEAD for all; PRIVACY_DENYLIST=<file> names a denylist
 #   too, and --denylist wins over it.
@@ -83,6 +86,10 @@ scan_files() {
   if git cat-file -e "$commit:.privacy-reviewed" 2>/dev/null; then
     git show "$commit:.privacy-reviewed" > "$work/reviewed-$commit"
     args+=(--reviewed "$work/reviewed-$commit")
+  fi
+  if git cat-file -e "$commit:.gitleaks.toml" 2>/dev/null; then
+    git show "$commit:.gitleaks.toml" > "$work/gitleaks-$commit.toml"
+    args+=(--gitleaks-config "$work/gitleaks-$commit.toml")
   fi
   out="$(scan "${args[@]}")" || result=$?
   if [ "$result" -ne 0 ]; then

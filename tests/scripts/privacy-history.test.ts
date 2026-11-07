@@ -88,6 +88,39 @@ function stubGitleaks(): string {
   return bin;
 }
 
+/** The line a stand-in config carries to allow the stand-in's one finding. */
+const ALLOW_LINE = 'allow-the-made-up-key';
+
+/**
+ * A `gitleaks` stand-in that reads its config the way gitleaks does, from `--config` first and
+ * else from the `.gitleaks.toml` in the folder it scans. It reports one `generic-api-key` hit on
+ * `a.txt` line 1 unless that config holds {@link ALLOW_LINE}.
+ */
+function configAwareGitleaks(): string {
+  const bin = tempDir();
+  const stub = join(bin, 'gitleaks');
+  writeFileSync(stub, [
+    '#!/bin/sh',
+    'for dir in "$@"; do :; done',
+    'config="$dir/.gitleaks.toml"',
+    'while [ $# -gt 0 ]; do',
+    '  case "$1" in',
+    '    --config) config="$2"; shift ;;',
+    '    --report-path) report="$2"; shift ;;',
+    '  esac',
+    '  shift',
+    'done',
+    `if [ -f "$dir/a.txt" ] && ! grep -qs '${ALLOW_LINE}' "$config"; then`,
+    '  printf \'[{"File":"%s/a.txt","StartLine":1,"RuleID":"generic-api-key"}]\' "$dir" > "$report"',
+    'else',
+    '  printf "[]" > "$report"',
+    'fi',
+    '',
+  ].join('\n'));
+  chmodSync(stub, 0o755);
+  return bin;
+}
+
 /** A denylist file whose one `word:` rule hits the placeholder word. */
 function denylist(): string {
   const list = join(tempDir(), 'denylist.tsv');
@@ -97,10 +130,15 @@ function denylist(): string {
 
 type Run = { exitCode: number; stdout: string; stderr: string };
 
-function history(dir: string, args: readonly string[], env: Record<string, string> = {}): Run {
+function history(
+  dir: string,
+  args: readonly string[],
+  env: Record<string, string> = {},
+  gitleaksBin: string = stubGitleaks(),
+): Run {
   const result = Bun.spawnSync(['bash', SCRIPT, ...args], {
     cwd: dir,
-    env: { ...baseEnv(stubGitleaks()), ...env },
+    env: { ...baseEnv(gitleaksBin), ...env },
     stdout: 'pipe',
     stderr: 'pipe',
   });
@@ -157,6 +195,30 @@ describe('the file scan', () => {
     expect(all.stdout).toBe(`commit ${base}:\na.txt:1 private-ip\n1 finding(s) (no denylist)\n`
       + `commit ${added}:\nb.txt:2 private-ip\n1 finding(s) (no denylist)\n`);
     expect(later.stdout).toBe(`commit ${added}:\nb.txt:2 private-ip\n1 finding(s) (no denylist)\n`);
+  });
+});
+
+describe('the gitleaks config', () => {
+  test('a commit that changes a file and not .gitleaks.toml is scanned with the .gitleaks.toml it holds', () => {
+    const dir = repo();
+    commit(dir, '.gitleaks.toml', `${ALLOW_LINE}\n`, 'add the gitleaks config');
+    commit(dir, 'a.txt', 'the first version\n', 'add the allowed file');
+    commit(dir, 'a.txt', 'the second version\n', 'change the allowed file alone');
+
+    const result = history(dir, ['HEAD'], {}, configAwareGitleaks());
+
+    expect(result.stdout).toBe('');
+    expect(result.exitCode).toBe(0);
+  });
+
+  test('a commit holding no .gitleaks.toml is scanned with the default rules, so the hit is reported', () => {
+    const dir = repo();
+    const sha = commit(dir, 'a.txt', 'a version\n', 'add a file with no config');
+
+    const result = history(dir, ['HEAD'], {}, configAwareGitleaks());
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toBe(`commit ${sha}:\na.txt:1 gitleaks:generic-api-key\n1 finding(s) (no denylist)\n`);
   });
 });
 
