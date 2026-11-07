@@ -66,6 +66,7 @@ function PasswordForm({ password = '', error, busy = false, onPasswordChange, on
             id={PASSWORD_INPUT_ID}
             type="password"
             autoComplete="current-password"
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- the sign-in page's only field; typing the password is all the page is for.
             autoFocus
             required
             value={password}

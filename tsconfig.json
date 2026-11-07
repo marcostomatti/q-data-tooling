@@ -1,28 +1,21 @@
 {
+  // The shared Bun flavor (strict core, `module: Preserve`, bun types), and below it only what is
+  // this project's own.
+  "extends": "@open-tomato/typescript-config/bun",
   "compilerOptions": {
-    // Environment setup & latest features
+    // The web app runs in the browser beside the Bun server, so the DOM types join the latest ES.
     "lib": ["ESNext", "DOM", "DOM.Iterable", "DOM.AsyncIterable"],
     "target": "ESNext",
-    "module": "Preserve",
-    "moduleDetection": "force",
     "jsx": "react-jsx",
     "allowJs": true,
-    "types": ["bun"],
-    // Bundler mode
-    "moduleResolution": "bundler",
+    // Imports name their `.ts` file, as Bun runs them.
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
-    "noEmit": true,
-    // Best practices
-    "strict": true,
-    "skipLibCheck": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
-    // Some stricter flags (disabled by default)
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noPropertyAccessFromIndexSignature": false
+    // A service, not a package: it emits no declaration files, so the declaration checks guard
+    // nothing here. `isolatedDeclarations` also cannot run beside `allowJs`, which the tests need
+    // to import the ESLint rules in `eslint/rules/*.mjs`.
+    "declaration": false,
+    "isolatedDeclarations": false
   },
   "exclude": [
     "node_modules",

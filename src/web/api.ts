@@ -14,13 +14,14 @@ const CSRF_HEADERS = { 'x-app-csrf': '1' } as const;
 
 /** A refusal or failure from the server, carrying its envelope's name and message. */
 export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly errorName: string,
-    message: string,
-  ) {
+  readonly status: number;
+  readonly errorName: string;
+
+  constructor(status: number, errorName: string, message: string) {
     super(message);
     this.name = 'ApiError';
+    this.status = status;
+    this.errorName = errorName;
   }
 }
 

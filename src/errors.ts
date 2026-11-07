@@ -17,13 +17,14 @@ const INTERNAL_ERROR = { name: 'InternalError', message: 'internal error' } as c
  * own foreign key is what found it out, and is never part of the message.
  */
 export class NotFoundError extends Error {
-  constructor(
-    readonly entity: string,
-    readonly id: string | number,
-    options?: ErrorOptions,
-  ) {
+  readonly entity: string;
+  readonly id: string | number;
+
+  constructor(entity: string, id: string | number, options?: ErrorOptions) {
     super(`${entity} ${id} does not exist`, options);
     this.name = 'NotFoundError';
+    this.entity = entity;
+    this.id = id;
   }
 }
 
@@ -39,24 +40,25 @@ export class NotFoundError extends Error {
  * SQL statement. The fault belongs on `cause`.
  */
 export class ConflictError extends Error {
-  constructor(
-    readonly field: string,
-    readonly key: string,
-    options?: ErrorOptions & { message?: string },
-  ) {
+  readonly field: string;
+  readonly key: string;
+
+  constructor(field: string, key: string, options?: ErrorOptions & { message?: string }) {
     super(options?.message ?? `${field} ${key} already exists`, options);
     this.name = 'ConflictError';
+    this.field = field;
+    this.key = key;
   }
 }
 
 /** One item in a bulk write failed; `index` says which one. The cause is kept off the message. */
 export class BulkItemError extends Error {
-  constructor(
-    readonly index: number,
-    cause: unknown,
-  ) {
+  readonly index: number;
+
+  constructor(index: number, cause: unknown) {
     super(`bulk item ${index} failed`, { cause });
     this.name = 'BulkItemError';
+    this.index = index;
   }
 }
 
@@ -66,12 +68,12 @@ export class BulkItemError extends Error {
  * written here, never the notebook's URL or a driver message, so it is safe to show a caller.
  */
 export class NotebookUnavailableError extends Error {
-  constructor(
-    readonly reason: string,
-    options?: ErrorOptions,
-  ) {
+  readonly reason: string;
+
+  constructor(reason: string, options?: ErrorOptions) {
     super(`the notebook is unavailable: ${reason}`, options);
     this.name = 'NotebookUnavailableError';
+    this.reason = reason;
   }
 }
 
@@ -81,12 +83,12 @@ export class NotebookUnavailableError extends Error {
  * `detail`, because Open Notebook often builds that text from an internal exception.
  */
 export class NotebookRequestError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-  ) {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
     super(message);
     this.name = 'NotebookRequestError';
+    this.status = status;
   }
 }
 

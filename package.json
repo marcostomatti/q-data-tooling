@@ -4,9 +4,8 @@
     "#db": "./src/data/sqlite/index.ts"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@eslint/markdown": "^8.0.3",
-    "@stylistic/eslint-plugin": "^5.10.0",
+    "@open-tomato/eslint-config": "^0.1.0",
+    "@open-tomato/typescript-config": "^0.1.0",
     "@types/bun": "latest",
     "@types/express": "^5.0.6",
     "@types/react": "19",
@@ -14,13 +13,6 @@
     "bun-plugin-tailwind": "^0.1.2",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9.39.5",
-    "eslint-import-resolver-typescript": "^4.4.5",
-    "eslint-plugin-import": "^2.32.0",
-    "eslint-plugin-jsonc": "^3.4.2",
-    "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^7.1.1",
-    "globals": "^17.13.0",
-    "jsonc-eslint-parser": "^3.3.0",
     "tailwindcss": "4",
     "typescript": "5",
     "typescript-eslint": "^8.72.1"
