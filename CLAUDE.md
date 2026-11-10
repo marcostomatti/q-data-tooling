@@ -38,10 +38,11 @@ reports on the exact import. `template/no-drizzle-transaction` is the other loca
 Gates: `bun run lint`, `bun run typecheck`, `bun run typecheck:pg`, `bun test` and
 `bun run privacy`, in that order. Without gitleaks on `PATH`, run
 `bun run privacy -- --no-gitleaks`; `tests/privacy.test.ts` runs that scan in `bun test`, with the
-denylist when `PRIVACY_DENYLIST` names it. Each Edit or Write runs `eslint --fix` on its file
-(`.claude/hooks/eslint-fix.ts`, registered in `.claude/settings.json`), so what ESLint can repair by
-itself is fixed as it is written. Run `bun run lint:fix` before the gates to sweep the rest, and fix
-by hand only what it leaves.
+denylist when `PRIVACY_DENYLIST` names it. `.githooks/pre-push` runs the same scan over the
+commits a push sends, once a clone sets `git config core.hooksPath .githooks`. Each Edit or Write
+runs `eslint --fix` on its file (`.claude/hooks/eslint-fix.ts`, registered in
+`.claude/settings.json`), so what ESLint can repair by itself is fixed as it is written. Run
+`bun run lint:fix` before the gates to sweep the rest, and fix by hand only what it leaves.
 
 ## Commands
 

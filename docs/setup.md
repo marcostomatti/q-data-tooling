@@ -284,6 +284,41 @@ Keep the file private. Never print, paste or commit its contents. A finding show
 not the matched text, and a commit message or report that names a removed term describes it by
 kind, such as "a private repository name", never by the word itself.
 
+### The pre-push hook
+
+A pushed branch of a public repository is public the moment it lands, and the privacy workflow
+in CI runs only after that. `.githooks/pre-push` runs the check before git sends anything, and
+refuses the push on a finding. It is off until you turn it on in a clone:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+No install script sets this, so a clone of the template gets no hook it did not ask for.
+
+The hook reads the refs git is about to push and scans each one's new commits, files and
+messages, with `scripts/privacy-history.sh`:
+
+- A deletion is skipped.
+- A branch or tag the remote already has scans `<remote sha>..<local sha>`.
+- A new branch or tag scans what `refs/remotes/<remote>/HEAD` lacks, or every commit when that
+  ref is missing. A remote sha this clone has not fetched counts as new too.
+
+The denylist is `PRIVACY_DENYLIST` when it is set, and otherwise `.rafa/privacy-denylist.tsv` in
+the main checkout, which every worktree of the clone shares. gitleaks is the one on `PATH`.
+Without one of them the scan runs with what is present and prints what it skipped.
+
+Strict mode refuses the push instead, naming the denylist file or gitleaks, whichever is
+missing. Turn it on in a clone that must never push without the full scan:
+
+```sh
+git config privacy.strict true
+```
+
+On a finding the hook prints the scan's own output, which names the file, line and label and
+never the matched text. It never prints a denylist term or the denylist's path. Exit 0 lets the
+push go ahead, and any other exit refuses all of it.
+
 ### Publishing with `scripts/public-export.ts`
 
 To publish a clone as a public repository with a fresh history, run the export from inside the
