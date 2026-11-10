@@ -23,11 +23,16 @@ const notebook = transport === undefined
   : await notebookStartup(process.env);
 const tools = [...ALL_TOOLS, ...(notebook?.tools ?? [])];
 
+// Over HTTP `setup` runs once per connecting client, and once at startup under stdio, so
+// everything a process must do once happens here and reaches `setup` by closure. The database
+// opens now, so a bad DATABASE_URL stops the start instead of failing each client's setup.
+const db = getDb();
+
 createMCP({
   serviceId: APP.id,
   setup: (server, { logger }) => {
     setupMcp(server, {
-      db: getDb(),
+      db,
       tools,
       notebook,
       // Undefined only once `applyTransport` has exited the process; the package reads it as HTTP.

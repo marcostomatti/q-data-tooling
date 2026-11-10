@@ -8,9 +8,11 @@
  * with an environment's type, `NodeJS.ProcessEnv` or `Record<string, string | undefined>`, or set
  * to the environment itself, as a dependency's compiled `env = process.env` default parameter is:
  * `.NAME`, `?.NAME`, `['NAME']`, `[CONST]` with `CONST` a string constant of the same file, or the
- * string after it in a call such as `value(env, 'NAME')`. A `Record<string, string>` is an
- * environment the code builds for a child, not one it reads, so the `PG*` names the backup passes
- * to `pg_dump` do not count. In a shell script a read is `${NAME:-...}`, the form `set -u` needs
+ * string after it in a call such as `value(env, 'NAME')`. A file that reads one by a variable key,
+ * `env[name]`, also reads each name a property ending in `Env` holds, such as `portEnv: 'NAME'`
+ * in a table of names, as a dependency's compiled port settings do. A `Record<string, string>` is
+ * an environment the code builds for a child, not one it reads, so the `PG*` names the backup
+ * passes to `pg_dump` do not count. In a shell script a read is `${NAME:-...}`, the form `set -u` needs
  * for a variable that may be unset, and in a compose file it is any `${NAME...}`. Comment lines
  * are not read.
  *
@@ -42,6 +44,7 @@ const COMMENT_LINE = /^\s*(?:\/\/|\/\*|\*|#)/;
 const ENV_TYPE = /\b(\w+)\??:\s*(?:Readonly<)?(?:NodeJS\.ProcessEnv|Record<string, string \| undefined>)/g;
 const ENV_ALIAS = /\b(\w+)\s*=\s*(?:process|Bun)\.env\b(?!\s*(?:\.|\?\.|\[))/g;
 const STRING_CONST = new RegExp(`\\bconst\\s+(\\w+)\\s*=\\s*'(${NAME})'`, 'g');
+const NAME_PROPERTY = new RegExp(`\\b\\w*Env\\s*:\\s*'(${NAME})'`, 'g');
 const SHELL_READ = new RegExp(`\\$\\{(${NAME}):?-`, 'g');
 const COMPOSE_READ = new RegExp(`(?<!\\$)\\$\\{(${NAME})`, 'g');
 const EXAMPLE_LINE = new RegExp(`^(?:# ?)?(${NAME})=`);
@@ -108,13 +111,17 @@ export function codeReads(source: string): ReadonlySet<string> {
     ...captures(text, read(`\\[\\s*'(${NAME})'\\s*\\]`)),
     ...captures(text, new RegExp(`\\w\\(\\s*(?:${holders})\\s*,\\s*'(${NAME})'`, 'g')),
   ];
-  const viaConstant = captures(text, read('\\[\\s*(\\w+)\\s*\\]')).flatMap((constant) => {
+  const keys = captures(text, read('\\[\\s*(\\w+)\\s*\\]'));
+  const viaConstant = keys.flatMap((constant) => {
     const name = constants.get(constant);
     return name === undefined
       ? []
       : [name];
   });
-  return new Set([...direct, ...viaConstant]);
+  const viaTable = keys.some((key) => !constants.has(key))
+    ? captures(text, NAME_PROPERTY)
+    : [];
+  return new Set([...direct, ...viaConstant, ...viaTable]);
 }
 
 /** The variables one shell script reads with a default expansion. */
@@ -258,6 +265,18 @@ describe('the read rules (failing control)', () => {
     ].join('\n');
 
     expect([...codeReads(source)].sort()).toEqual(['IOTA', 'MU', 'NU', 'THETA']);
+  });
+
+  test('codeReads reads through a table of names when the file reads the environment by a variable key', () => {
+    const tabled = [
+      'const NAMES = { configKey: \'port\', portEnv: \'OMICRON\', strictEnv: \'PI\', other: \'RHO\' };',
+      'function read(env, name) { return env[name]; }',
+      'export function resolve(env = process.env) { return read(env, NAMES.portEnv); }',
+    ].join('\n');
+    const untabled = 'const NAMES = { portEnv: \'SIGMA\' };\nconst one = process.env.TAU;';
+
+    expect([...codeReads(tabled)].sort()).toEqual(['OMICRON', 'PI']);
+    expect([...codeReads(untabled)]).toEqual(['TAU']);
   });
 
   test('shellReads and composeReads read only their forms', () => {

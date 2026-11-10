@@ -9,7 +9,7 @@
         "@open-tomato/service": "^2.0.0",
         "@open-tomato/service-express": "^2.0.0",
         "@open-tomato/service-logger": "^2.0.0",
-        "@open-tomato/service-mcp": "^2.0.0",
+        "@open-tomato/service-mcp": "^2.1.0",
         "drizzle-orm": "^0.45.4",
         "express": "^5.3.0",
         "jose": "6",
@@ -189,7 +189,7 @@
 
     "@open-tomato/service-logger": ["@open-tomato/service-logger@2.0.0", "", { "dependencies": { "@open-tomato/service": "^2.0.0", "pino": "^10.4.0", "pino-http": "^11.0.0" } }, "sha512-hDvlkv4o2qbNi/+hhfPevzZ4QuJkZZuM2qynwLfeq/C8ZGTB7ZyvIX1Frx1SG6Ge535/drdNshfShT3AxUvhGQ=="],
 
-    "@open-tomato/service-mcp": ["@open-tomato/service-mcp@2.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.32.2", "@open-tomato/service": "^2.0.0", "@open-tomato/service-logger": "^2.0.0", "zod": "^4.6.7" } }, "sha512-YIf3fVFnGRpFyVMIsZ7eBxr3MlAcOgDIrJowMhonqGI4kxCrGE1Ky/p/NkjRRyRRfctk1gPJo5b47iFV+L/V0A=="],
+    "@open-tomato/service-mcp": ["@open-tomato/service-mcp@2.1.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.32.2", "@open-tomato/service": "^2.0.0", "@open-tomato/service-logger": "^2.0.0", "zod": "^4.6.7" } }, "sha512-sinDwB+qkeMetJ889lVM6Pcc5SzxcukUehFErDwUtp6IVFGrM6Dc62k8oB26ct6depdJNNLlYqhTSyPLewMzZw=="],
 
     "@open-tomato/typescript-config": ["@open-tomato/typescript-config@0.1.0", "", { "peerDependencies": { "typescript": ">=5.8.0" } }, "sha512-Vj7i7jIW9ZFNSTJK/BLX93Tzk9pk9t+j6J3Q5Z78Lb9Fq+SAJdauUhbISl5H4wraYIA6HlkSddkX+1jI/jbSSg=="],
 
