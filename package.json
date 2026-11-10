@@ -23,7 +23,7 @@
     "@open-tomato/service": "^2.0.0",
     "@open-tomato/service-express": "^2.0.0",
     "@open-tomato/service-logger": "^2.0.0",
-    "@open-tomato/service-mcp": "^2.0.0",
+    "@open-tomato/service-mcp": "^2.1.0",
     "drizzle-orm": "^0.45.4",
     "express": "^5.3.0",
     "jose": "6",
