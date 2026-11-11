@@ -31,7 +31,12 @@ const TEST_KEY = 'test-key-for-the-server-entry-'.padEnd(GENERATED_KEY_LENGTH, '
 
 type Running = { readonly handle: ServiceHandle };
 
-const savedEnv = { apiKey: process.env.API_KEY, databaseUrl: process.env.DATABASE_URL, logLevel: process.env.LOG_LEVEL };
+const savedEnv = {
+  apiKey: process.env.API_KEY,
+  authMode: process.env.AUTH_MODE,
+  databaseUrl: process.env.DATABASE_URL,
+  logLevel: process.env.LOG_LEVEL,
+};
 let running: Running | undefined;
 
 /**
@@ -103,6 +108,10 @@ afterAll(() => {
 
 beforeEach(async () => {
   process.env.API_KEY = TEST_KEY;
+  // No login mode, whatever `.env` sets: Bun loads `.env` into the tests, and `bun run
+  // set-password` writes `AUTH_MODE=password` there, which would let the service start without
+  // an API_KEY and hide the key refusal the tests below assert.
+  delete process.env.AUTH_MODE;
   // A private database that ends with its connection, so no test opens or writes a file.
   process.env.DATABASE_URL = MEMORY_DATABASE;
   await closeDb();
@@ -112,6 +121,7 @@ afterEach(async () => {
   await stopRunning();
   await closeDb();
   restore('API_KEY', savedEnv.apiKey);
+  restore('AUTH_MODE', savedEnv.authMode);
   restore('DATABASE_URL', savedEnv.databaseUrl);
 });
 
