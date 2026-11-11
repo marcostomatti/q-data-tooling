@@ -25,12 +25,14 @@ The signed-in app has these pages, in nav order:
 
 | Path | Nav label | Icon | Page |
 | --- | --- | --- | --- |
-| `/home` | Home | `house` | `HomePage` in `src/web/pages/home.tsx`, the landing page |
+| `/summary` | Summary | `chart-column-stacked` | `SummaryPage` in `src/web/pages/summary/`, the landing page |
+| `/companies` | Companies | `building-2` | `CompaniesPage` in `src/web/pages/companies/` |
 | `/tokens` | Tokens | `key-round` | `TokensPage` in `src/web/pages/tokens.tsx`, for API tokens |
 
-`/home` is the landing path in `APP.landing`. `/` lands there. A path the app does not list also
-shows the landing page, and the address bar is moved to it. The sign-in page is not in the nav:
-it is what the app shows when nobody is signed in.
+`/summary` is the landing path in `APP.landing`. `/` lands there. A path the app does not list
+also shows the landing page, and the address bar is moved to it. The sign-in page is not in the
+nav: it is what the app shows when nobody is signed in. A page draws no heading of its own: the
+topbar's `AppShellTitle` shows its nav label as the screen's one `h1`.
 
 The nav is built from `PAGES` in `src/web/app.tsx`, so that list is the one place a page is
 added to the nav.
@@ -57,10 +59,10 @@ A build that fails prints each of its messages to stderr, then `build:web failed
 
 ### Serve it
 
-Build before you start the service, then start it with `bun run serve`. The service looks for
-`src/web/dist/` once, when it starts. When the folder is there, the service serves its files and
-answers each path in `APP_PATHS` with `index.html`. Those paths are `/`, `/login`, the landing
-path and `/tokens`. Restart `bun run serve` after each build, as
+`bun run serve` runs the build, then starts the service. The service looks for `src/web/dist/`
+once, when it starts. When the folder is there, the service serves its files and answers each
+path in `APP_PATHS` with `index.html`. Those paths are `/`, `/login`, the landing path and each
+other page's path. To see a change to the app, restart `bun run serve`, as
 [the web build](setup.md#the-web-build) says.
 
 The app and the API share one origin, so the browser needs no CORS setup. A write from the app
@@ -71,8 +73,8 @@ unless it is passed as the `webDist` option of `startService`.
 
 ### Add a page with `/fe empty-page`
 
-`/fe empty-page` is the one `/fe` action built. It creates a page that shows a heading and an
-empty state, and fetches nothing. Call it with the page's name:
+`/fe empty-page` is the one `/fe` action built. It creates a page that shows an empty state and
+fetches nothing; the topbar shows its nav label as the heading. Call it with the page's name:
 
 ```text
 /fe empty-page reports
@@ -94,8 +96,9 @@ The new `PAGES` entry is one line after the landing entry, like this:
 ```tsx
 // src/web/app.tsx
 export const PAGES: readonly AppPage[] = [
-  { path: APP.landing.path, label: APP.landing.label, icon: 'house', render: () => <HomePage /> },
-  { path: '/reports', label: 'Reports', icon: 'house', render: () => <ReportsPage /> },
+  { path: APP.landing.path, label: APP.landing.label, icon: 'chart-column-stacked', render: () => <SummaryPage /> },
+  { path: '/reports', label: 'Reports', icon: 'file-text', render: () => <ReportsPage /> },
+  // …the entries after it
 ];
 ```
 
@@ -119,8 +122,8 @@ The web app reads no environment variable. Its settings are these constants and 
 
 | Setting | Default | What it does | Read by |
 | --- | --- | --- | --- |
-| `APP.name` | `Template service` | The name in the brand of the signed-in frame. | `src/app-config.ts`, read by `src/web/app.tsx` |
-| `APP.landing` | `{ path: '/home', label: 'Home' }` | The landing page: where `/` lands, and the first nav entry. | `src/app-config.ts`, read by `src/web/app.tsx` and `src/http/server.ts` |
+| `APP.name` | `SEC filings` | The name in the brand of the signed-in frame. | `src/app-config.ts`, read by `src/web/app.tsx` |
+| `APP.landing` | `{ path: '/summary', label: 'Summary' }` | The landing page: where `/` lands, and the first nav entry. | `src/app-config.ts`, read by `src/web/app.tsx` and `src/http/server.ts` |
 | `--outdir=<dir>` | `src/web/dist` | Where `bun run build:web` writes. Only the default folder is emptied before a build. | `scripts/build-web.ts` |
 | `webDist` | `src/web/dist` | Where the service looks for the bundle at start. Set only in a test or a custom start. | `src/http/server.ts` |
 
@@ -136,7 +139,7 @@ It prints three absolute paths, the `index.html` and the two chunk files, and ex
 restart `bun run serve`, and the service answers the landing path with the app:
 
 ```sh
-curl -s -o /dev/null -w '%{http_code}\n' localhost:3000/home
+curl -s -o /dev/null -w '%{http_code}\n' localhost:3000/summary
 ```
 
 It prints `200`. The same check works for `/tokens` and `/login`, which the server answers with

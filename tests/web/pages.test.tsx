@@ -1,14 +1,28 @@
+import type { ReactElement } from 'react';
+
 import { readFileSync } from 'node:fs';
 
+import { ConfirmPopover, Content } from '@open-tomato/components';
 import { describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import { APP } from '../../src/app-config.ts';
 import { ApiError, request, type TokenSummary } from '../../src/web/api.ts';
 import { pageFor, PAGES, Shell } from '../../src/web/app.tsx';
-import { HOME_EMPTY_DESCRIPTION, HomePage, HomeView } from '../../src/web/pages/home.tsx';
 import { LoginPage, LoginView } from '../../src/web/pages/login.tsx';
-import { TOKENS_EMPTY_TITLE, TokensPage, TokensView } from '../../src/web/pages/tokens.tsx';
+import { SUMMARY_PATH, SUMMARY_TITLE } from '../../src/web/pages/summary/logic.ts';
+import {
+  MintForm,
+  REVOKE_CONFIRM_LABEL,
+  REVOKE_LABEL,
+  revokeMessage,
+  tokenColumns,
+  TOKENS_EMPTY_TITLE,
+  TokensPage,
+  TokensView,
+} from '../../src/web/pages/tokens.tsx';
+
+import { settle } from './settle.tsx';
 
 const noop = (): void => {};
 
@@ -53,11 +67,12 @@ describe('Shell', () => {
     expect(entries.find((entry) => entry.current)?.label).toBe(APP.landing.label);
   });
 
-  test('shows the brand, the page label in the topbar, a sign-out action and the page', () => {
+  test('shows the brand, the page label as the topbar\'s only h1, a sign-out action and the page', () => {
     const html = renderShell('/tokens');
 
     expect(html).toContain(`aria-label="${APP.name}"`);
-    expect(html).toMatch(/<header[^>]*>.*<span[^>]*>Tokens<\/span>.*<\/header>/);
+    expect(html).toMatch(/<header[^>]*>.*<h1[^>]*>Tokens<\/h1>.*<\/header>/);
+    expect(html.match(/<h1/g)?.length).toBe(1);
     expect(html).toMatch(/<button[^>]*>Sign out<\/button>/);
     expect(html).toContain('<p>page body</p>');
   });
@@ -69,12 +84,11 @@ function classesOf(html: string, pattern: RegExp): string[] {
 }
 
 describe('Shell layout', () => {
-  test('sizes html, body and #root to the viewport, since AppShell only fills the box its parent gives it', () => {
-    const rule = STYLES.match(/[^{}]*\{[^}]*\}/g)?.find((block) => block.includes('#root')) ?? '';
+  test('fills the viewport through the AppShell `viewport` flag, so the stylesheet sizes no root box', () => {
+    const frame = classesOf(renderShell('/'), /^<div class="([^"]*)"/);
 
-    expect(rule).toMatch(/\bhtml\b/);
-    expect(rule).toMatch(/\bbody\b/);
-    expect(rule).toMatch(/height:\s*100%/);
+    expect(frame).toContain('h-dvh');
+    expect(STYLES).not.toContain('#root');
   });
 
   test('puts the brand in a row as tall as the topbar, so their dividers line up', () => {
@@ -88,8 +102,8 @@ describe('Shell layout', () => {
     }
   });
 
-  test('pushes the sign-out action to the far end of the topbar', () => {
-    expect(renderShell('/')).toMatch(/<div class="flex-1"><\/div><button[^>]*>Sign out<\/button>/);
+  test('pushes the sign-out action to the far end of the topbar, after the title that takes the free space', () => {
+    expect(renderShell('/tokens')).toMatch(/<h1[^>]*>Tokens<\/h1><button[^>]*>Sign out<\/button>/);
   });
 });
 
@@ -209,6 +223,13 @@ describe('TokensView', () => {
     expect(named).toMatch(/<button[^>]*>Create token<\/button>/);
   });
 
+  test('the mint form stacks the field over its button row, as the library\'s FormKit story does', () => {
+    const form = MintForm({ tokens: [], name: 'ci runner' }) as ReactElement<{ children: ReactElement<{ direction?: string }> }>;
+    const column = form.props.children;
+    expect(column.type).toBe(Content);
+    expect(column.props.direction).toBe('col');
+  });
+
   test('a revoked token carries the revoked badge and no Revoke button', () => {
     const html = renderToStaticMarkup(<TokensView tokens={LISTED} />);
 
@@ -232,15 +253,33 @@ describe('TokensView', () => {
     expect(html).not.toContain(TOKENS_EMPTY_TITLE);
   });
 
-  test('revoke asks first: only the confirming row swaps its button for a confirm naming the token', () => {
-    const plain = renderToStaticMarkup(<TokensView tokens={LISTED} />);
-    const confirming = renderToStaticMarkup(<TokensView tokens={LISTED} confirmingId={1} />);
+  test('puts Revoke behind a ConfirmPopover naming the token, so only the confirm revokes it', () => {
+    const revoked: number[] = [];
+    const cell = tokenColumns({ onRevoke: (id) => revoked.push(id) }).find((column) => column.key === 'actions')
+      ?.cell?.(LISTED[0]!) as ReactElement<Record<string, unknown>>;
 
-    expect(plain).not.toContain('Yes, revoke');
-    expect(confirming).toContain('Revoke “research agent”?');
-    expect(confirming).toMatch(/<button[^>]*>Yes, revoke<\/button>/);
-    expect(confirming).toMatch(/<button[^>]*>Cancel<\/button>/);
-    expect(confirming).not.toContain('>Revoke</button>');
+    expect(cell.type).toBe(ConfirmPopover);
+    expect(cell.props.message).toBe(revokeMessage('research agent'));
+    expect(revokeMessage('research agent')).toContain('Revoke “research agent”?');
+    expect(cell.props.confirmLabel).toBe(REVOKE_CONFIRM_LABEL);
+    expect(cell.props.danger).toBe(true);
+    const trigger = cell.props.children as ReactElement<Record<string, unknown>>;
+    expect(trigger.props.children).toBe(REVOKE_LABEL);
+    expect(trigger.props.onClick).toBeUndefined();
+    expect(revoked).toEqual([]);
+
+    (cell.props.onConfirm as () => void)();
+    expect(revoked).toEqual([1]);
+  });
+
+  test('the fixed columns leave the name 120px in a 1024px window with the sidebar open', () => {
+    // Measured in the browser: the page's content is the window less the 264px sidebar and 44px
+    // of padding, so 716px at 1024. The name column takes what the fixed widths leave.
+    const tableWidth = 1024 - 264 - 44;
+    const fixed = tokenColumns({}).reduce((sum, column) => sum + (typeof column.width === 'number'
+      ? column.width
+      : 0), 0);
+    expect(tableWidth - fixed).toBeGreaterThanOrEqual(120);
   });
 
   test('the just-minted token is shown once with a copy button, and never listed whole', () => {
@@ -271,6 +310,28 @@ describe('TokensView', () => {
     expect(html).toMatch(/role="alert"[^>]*>.*could not load the tokens/);
   });
 
+  test('the page revokes through api.revokeToken and reloads the list', async () => {
+    const calls: string[] = [];
+    const api = {
+      listTokens: async () => {
+        calls.push('list');
+        return LISTED;
+      },
+      createToken: async () => ({ token: WHOLE_TOKEN, summary: LISTED[0]! }),
+      revokeToken: async (id: number) => {
+        calls.push(`revoke ${id}`);
+        return LISTED[0]!;
+      },
+    };
+    const page = await settle(<TokensPage api={api} initial={LISTED} />);
+    calls.length = 0;
+
+    (page.tree.props.onRevoke as (id: number) => void)(1);
+    await page.flush();
+    page.stop();
+    expect(calls).toEqual(['revoke 1', 'list']);
+  });
+
   test('the page renders the view over its first list, with no fresh token', () => {
     const html = renderToStaticMarkup(<TokensPage initial={LISTED} />);
 
@@ -280,8 +341,9 @@ describe('TokensView', () => {
 });
 
 describe('the page table', () => {
-  test('holds the landing page from the app config, then companies, then summary, then tokens', () => {
-    expect(PAGES.map((page) => page.path)).toEqual([APP.landing.path, '/companies', '/summary', '/tokens']);
+  test('lands on the summary, then holds companies, then tokens', () => {
+    expect(APP.landing).toEqual({ path: SUMMARY_PATH, label: SUMMARY_TITLE });
+    expect(PAGES.map((page) => page.path)).toEqual([SUMMARY_PATH, '/companies', '/tokens']);
     expect(PAGES[0]?.label).toBe(APP.landing.label);
   });
 
@@ -297,11 +359,10 @@ describe('the page table', () => {
 });
 
 describe('the pages together', () => {
-  test('/ and an unknown path land on the landing path, and PAGES holds only landing, /companies, /summary and /tokens', () => {
-    expect(pageFor('/').path).toBe(APP.landing.path);
-    expect(pageFor('/nowhere').path).toBe(APP.landing.path);
-    expect(PAGES).toHaveLength(4);
-    expect(PAGES.map((page) => page.path)).toEqual([APP.landing.path, '/companies', '/summary', '/tokens']);
+  test('/ and an unknown path land on the summary, and PAGES holds only /summary, /companies and /tokens', () => {
+    expect(pageFor('/').path).toBe(SUMMARY_PATH);
+    expect(pageFor('/nowhere').path).toBe(SUMMARY_PATH);
+    expect(PAGES).toHaveLength(3);
   });
 
   test.each(PAGES.map((page) => page.path))('the nav holds one entry per PAGES entry around the page at %s', (path) => {
@@ -316,35 +377,9 @@ describe('the pages together', () => {
     expect(entries.filter((entry) => entry.current).map((entry) => entry.label)).toEqual([pageFor(path).label]);
     expect(html).toContain(renderToStaticMarkup(pageFor(path).render()));
   });
-});
 
-describe('HomeView', () => {
-  test('holds no form, table or link of its own', () => {
-    const html = renderToStaticMarkup(<HomeView />);
-    expect(html).not.toContain('<form');
-    expect(html).not.toContain('<table');
-    expect(html).not.toContain('<a ');
-  });
-
-  test('a given title replaces the landing label in the header', () => {
-    const html = renderToStaticMarkup(<HomeView title="Elsewhere" />);
-    expect(html).toContain('<h1>Elsewhere</h1>');
-    expect(html).not.toContain(`<h1>${APP.landing.label}</h1>`);
-  });
-
-  test('heads the page with the landing label from the app config', () => {
-    expect(renderToStaticMarkup(<HomeView />)).toContain(`<h1>${APP.landing.label}</h1>`);
-  });
-
-  test('says the first page goes into PAGES in src/web/app.tsx', () => {
-    const html = renderToStaticMarkup(<HomeView />);
-    expect(HOME_EMPTY_DESCRIPTION).toContain('PAGES');
-    expect(HOME_EMPTY_DESCRIPTION).toContain('src/web/app.tsx');
-    expect(html).toContain(renderToStaticMarkup(<>{HOME_EMPTY_DESCRIPTION}</>));
-  });
-
-  test('HomePage renders the view', () => {
-    expect(renderToStaticMarkup(<HomePage />)).toBe(renderToStaticMarkup(<HomeView />));
+  test.each(PAGES.map((page) => page.path))('the page at %s leaves its title to the topbar and draws no h1 of its own', (path) => {
+    expect(renderToStaticMarkup(pageFor(path).render())).not.toContain('<h1');
   });
 });
 

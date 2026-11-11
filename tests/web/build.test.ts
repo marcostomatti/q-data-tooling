@@ -116,3 +116,14 @@ describe('hoistUrlImports', () => {
     expect(hoistUrlImports(css)).toBe(css);
   });
 });
+
+describe('the serve script', () => {
+  // The server reads `src/web/dist` once, at start, and nothing else refreshes it, so a `serve`
+  // that skips the build keeps showing whatever bundle the last manual build left.
+  test('builds the web app before it starts the server', async () => {
+    const manifest: unknown = await Bun.file(join(PROJECT_ROOT, 'package.json')).json();
+    const scripts = (manifest as { scripts: Record<string, string> }).scripts;
+
+    expect(scripts.serve).toBe('bun run build:web && bun src/http/server.ts');
+  });
+});

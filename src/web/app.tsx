@@ -3,10 +3,13 @@ import type { IconName } from '@open-tomato/components';
 
 import {
   AppShell,
+  AppShellBrand,
   AppShellContent,
   AppShellMain,
   AppShellSidebar,
+  AppShellTitle,
   AppShellTopbar,
+  Banner,
   Button,
   Monogram,
   SidebarNav,
@@ -15,12 +18,13 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import { APP } from '../app-config.ts';
 
-import { auth, type SessionState } from './api.ts';
-import { CompaniesPage } from './pages/companies.tsx';
-import { HomePage } from './pages/home.tsx';
+import { auth, messageOf, type SessionState } from './api.ts';
+import { CompaniesPage } from './pages/companies/index.tsx';
+import { COMPANIES_TITLE } from './pages/companies/logic.ts';
 import { LoginPage } from './pages/login.tsx';
-import { SummaryPage } from './pages/summary.tsx';
+import { SummaryPage } from './pages/summary/index.tsx';
 import { TokensPage } from './pages/tokens.tsx';
+import { navigate, usePath } from './router.ts';
 
 /** One page the signed-in app shows, and its place in the nav. */
 export interface AppPage {
@@ -31,11 +35,13 @@ export interface AppPage {
   readonly render: () => ReactNode
 }
 
-/** The pages behind the sign-in, in nav order. The first is where `/` lands. */
+/**
+ * The pages behind the sign-in, in nav order. The first is where `/` lands: the summary, whose
+ * path and label `APP.landing` holds.
+ */
 export const PAGES: readonly AppPage[] = [
-  { path: APP.landing.path, label: APP.landing.label, icon: 'house', render: () => <HomePage /> },
-  { path: '/companies', label: 'Companies', icon: 'building-2', render: () => <CompaniesPage /> },
-  { path: '/summary', label: 'Summary', icon: 'chart-column-stacked', render: () => <SummaryPage /> },
+  { path: APP.landing.path, label: APP.landing.label, icon: 'chart-column-stacked', render: () => <SummaryPage /> },
+  { path: '/companies', label: COMPANIES_TITLE, icon: 'building-2', render: () => <CompaniesPage /> },
   { path: '/tokens', label: 'Tokens', icon: 'key-round', render: () => <TokensPage /> },
 ];
 
@@ -45,36 +51,6 @@ export function pageFor(path: string): AppPage {
   if (!first) throw new Error('the app has no pages');
   return PAGES.find((page) => page.path === path) ?? first;
 }
-
-function navigate(path: string): void {
-  window.history.pushState(null, '', path);
-  window.dispatchEvent(new PopStateEvent('popstate'));
-}
-
-function usePath(): string {
-  const [path, setPath] = useState(() => window.location.pathname);
-  useEffect(() => {
-    const onPop = (): void => setPath(window.location.pathname);
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, []);
-  return path;
-}
-
-/**
- * The shell's own classes. The library's `AppShell` story draws its brand row, wordmark, topbar
- * title and spacer with story-only classes the library does not export, so the shell carries
- * the same ones here. The brand row is as tall as the topbar (`h-[60px]`) with the same divider,
- * so the two line up across the frame.
- */
-const SHELL_CLASSES = {
-  brandRow: 'flex h-[60px] shrink-0 items-center gap-2.5 border-b border-border-soft',
-  brandRowOpen: 'justify-start px-[18px]',
-  brandRowCollapsed: 'justify-center p-0',
-  wordmark: 'font-display text-[17px] font-bold tracking-[-0.02em] text-fg1',
-  title: 'font-display text-lg font-bold tracking-[-0.015em] text-fg1',
-  spacer: 'flex-1',
-} as const;
 
 /** The props of {@link Shell}: the page on show, its content, and the actions the frame offers. */
 export interface ShellProps {
@@ -91,21 +67,21 @@ export interface ShellProps {
 /**
  * The signed-in frame, composed as the library's default `AppShell` story: a collapsible rail
  * holding the brand from `APP.name` and the nav built from {@link PAGES}, and beside it a topbar
- * with the collapse toggle, the current page's label and a sign-out button over the page.
+ * with the collapse toggle, the current page's label as the screen's one `h1`, and a sign-out
+ * button over the page. Every part is a library export styled by its own variants; the shell
+ * passes no class string. The frame fills the viewport (`viewport`), so the stylesheet sizes no
+ * root box.
  */
 export function Shell({ current, onSignOut, onNavigate = navigate, children }: ShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   return (
-    <AppShell>
+    <AppShell viewport>
       <AppShellSidebar collapsed={collapsed}>
-        <div
-          className={`${SHELL_CLASSES.brandRow} ${collapsed
-            ? SHELL_CLASSES.brandRowCollapsed
-            : SHELL_CLASSES.brandRowOpen}`}
-        >
-          <Monogram name={APP.name} tone="primary" size="sm" />
-          {!collapsed && <span className={SHELL_CLASSES.wordmark}>{APP.name}</span>}
-        </div>
+        <AppShellBrand
+          collapsed={collapsed}
+          mark={<Monogram name={APP.name} tone="primary" size="sm" />}
+          wordmark={APP.name}
+        />
         <SidebarNav
           items={PAGES.map((page) => ({ id: page.path, label: page.label, icon: page.icon }))}
           activeId={current.path}
@@ -118,8 +94,7 @@ export function Shell({ current, onSignOut, onNavigate = navigate, children }: S
           sidebarCollapsed={collapsed}
           onToggleSidebar={() => setCollapsed((was) => !was)}
         >
-          <span className={SHELL_CLASSES.title}>{current.label}</span>
-          <div className={SHELL_CLASSES.spacer} />
+          <AppShellTitle>{current.label}</AppShellTitle>
           <Button variant="ghost" size="sm" onClick={onSignOut}>
             Sign out
           </Button>
@@ -140,9 +115,7 @@ export function App() {
     try {
       setSession(await auth.session());
     } catch (failure: unknown) {
-      setError(failure instanceof Error
-        ? failure.message
-        : 'the server did not answer');
+      setError(messageOf(failure, 'the server did not answer'));
     }
   }, []);
 
@@ -152,8 +125,16 @@ export function App() {
     void refresh();
   }, [refresh]);
 
-  if (error !== undefined) return <p className="error page">{error}</p>;
-  if (session === undefined) return <p className="muted page">Loading…</p>;
+  if (error !== undefined) {
+    return (
+      <Banner tone="danger" role="alert">
+        {error}
+      </Banner>
+    );
+  }
+  // The session answers in milliseconds from the same origin, so the wait draws nothing rather
+  // than a flash of a loading line.
+  if (session === undefined) return null;
 
   if (!session.signedIn) {
     const oidcError = new URLSearchParams(window.location.search).get('error') === 'oidc';

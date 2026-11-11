@@ -7,7 +7,7 @@ export const APP = {
   /** The service id the chassis and the MCP server report, and the prefix of the session cookie. */
   id: 'template-service',
   /** The name a person reads: the browser title and the brand in the app shell. */
-  name: 'Template service',
-  /** The first page behind the sign-in, where `/` lands. Rename both to fit the app. */
-  landing: { path: '/home', label: 'Home' },
+  name: 'SEC filings',
+  /** The first page behind the sign-in, where `/` lands: the summary of the selected companies. */
+  landing: { path: '/summary', label: 'Summary' },
 } as const;

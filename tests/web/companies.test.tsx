@@ -6,11 +6,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import { ApiError, createCompaniesClient } from '../../src/web/api.ts';
 import { pageFor } from '../../src/web/app.tsx';
-import { FilingsDialog } from '../../src/web/components/filings-view.tsx';
+import { FilingsDialog } from '../../src/web/components/filings/index.tsx';
 import {
   CompaniesPage,
-  CompaniesView,
-  CompanyRow,
+} from '../../src/web/pages/companies/index.tsx';
+import {
+  ALL_COMPANIES_LABEL,
   COMPANIES_EMPTY_DESCRIPTION,
   COMPANIES_EMPTY_TITLE,
   COMPANIES_PAGE_SIZE,
@@ -23,7 +24,13 @@ import {
   withCompany,
   withSearch,
   withSelectedOnly,
-} from '../../src/web/pages/companies.tsx';
+} from '../../src/web/pages/companies/logic.ts';
+import {
+  CompanyRow,
+} from '../../src/web/pages/companies/row.tsx';
+import {
+  CompaniesView,
+} from '../../src/web/pages/companies/view.tsx';
 
 import { settle } from './settle.tsx';
 
@@ -81,9 +88,10 @@ function buttonTag(html: string, label: string): string {
 }
 
 describe('CompaniesView', () => {
-  test('shows its title and the empty state', () => {
+  test('leaves its title to the topbar and shows the empty state', () => {
     const html = renderToStaticMarkup(<CompaniesView />);
-    expect(html).toContain(`<h1>${COMPANIES_TITLE}</h1>`);
+    expect(html).not.toContain('<h1');
+    expect(pageFor('/companies').label).toBe(COMPANIES_TITLE);
     expect(html).toContain(COMPANIES_EMPTY_TITLE);
     expect(html).toContain(COMPANIES_EMPTY_DESCRIPTION);
   });
@@ -94,15 +102,16 @@ describe('CompaniesView', () => {
     );
     expect(html).toContain('value="app"');
     expect(html).toContain('aria-label="Search companies"');
-    expect(html).toContain(SELECTED_ONLY_LABEL);
-    expect(html).toContain('role="checkbox" aria-checked="true"');
+    expect(html).toMatch(new RegExp(`aria-selected="true"[^>]*>${SELECTED_ONLY_LABEL}</button>`));
+    expect(html).toMatch(new RegExp(`aria-selected="false"[^>]*>${ALL_COMPANIES_LABEL}</button>`));
     expect(html).toContain('60 companies');
     expect(html).toContain('Page 2 of 3');
   });
 
-  test('the filter reads unchecked when off', () => {
+  test('the filter shows every company when off', () => {
     const html = renderToStaticMarkup(<CompaniesView />);
-    expect(html).toContain('role="checkbox" aria-checked="false"');
+    expect(html).toMatch(new RegExp(`aria-selected="true"[^>]*>${ALL_COMPANIES_LABEL}</button>`));
+    expect(html).not.toContain('role="checkbox"');
   });
 
   test('Previous is disabled on page 1 and Next on the last page', () => {
@@ -142,6 +151,11 @@ describe('CompanyRow', () => {
     expect(renderToStaticMarkup(<CompanyRow company={APPLE} />)).toContain('role="switch" aria-checked="true"');
     expect(renderToStaticMarkup(<CompanyRow company={MICROSOFT} />)).toContain('role="switch" aria-checked="false"');
     expect(renderToStaticMarkup(<CompanyRow company={MICROSOFT} />)).toContain('aria-label="Show Microsoft Corp in the summary"');
+  });
+
+  test('the sync day is the first ministat, so its width moves no other one', () => {
+    const card = CompanyRow({ company: MICROSOFT }) as ReactElement<{ stats: { title: string }[] }>;
+    expect(card.props.stats.map((stat) => stat.title)).toEqual(['synced', 'cik', 'exchange']);
   });
 
   test('an unsynced company shows no exchange and never', () => {

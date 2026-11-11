@@ -29,11 +29,12 @@ and offer `empty-page` plus hand composition from the library's stories:
 ## Where the pieces live
 
 - Page: `src/web/pages/<name>.tsx` holds an `XPage` and a pure `XView`, as `src/web/README.md`
-  describes. `src/web/pages/home.tsx` is the empty-page example.
+  describes; `src/web/pages/tokens.tsx` is the one-file example. A page that grows past that
+  pair becomes a folder, `src/web/pages/<name>/`, as `companies/` and `summary/` are.
 - Nav: `PAGES` in `src/web/app.tsx` lists every page the signed-in app shows, in nav order.
 - Server path: `APP_PATHS` in `src/http/server.ts` lists the paths the server hands the app to,
   so a reload on a deep link is served.
 - Test: `tests/web/<name>.test.tsx` renders the view, as `tests/web/pages.test.tsx` does.
 
-The library has no page-header component, so the header is an `h1` in a `Content` row, as
-`src/web/pages/home.tsx` shows.
+A page draws no heading. The shell's `AppShellTitle` shows the page's nav label as the screen's
+one `h1`, and `tests/web/pages.test.tsx` fails for a page that renders an `h1` of its own.

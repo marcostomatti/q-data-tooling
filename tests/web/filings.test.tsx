@@ -1,8 +1,8 @@
 import type { Filing, FilingPage } from '../../src/web/api.ts';
-import type { FilingsApi, FilingsResult } from '../../src/web/components/filings-view.tsx';
+import type { FilingsApi, FilingsResult } from '../../src/web/components/filings/logic.ts';
 import type { ReactElement } from 'react';
 
-import { Drawer, Modal } from '@open-tomato/components';
+import { Drawer, Entity, Modal } from '@open-tomato/components';
 import { describe, expect, test } from 'bun:test';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -11,27 +11,40 @@ import { TrackedForm } from '../../src/entities/filing.ts';
 import { buildLinks } from '../../src/sec/parse.ts';
 import { createFilingsClient, filingsPath } from '../../src/web/api.ts';
 import {
+  FilingsAccordion,
+} from '../../src/web/components/filings/accordion.tsx';
+import {
+  FilingRow,
+} from '../../src/web/components/filings/filing-row.tsx';
+import {
+  FilingsGrid,
+} from '../../src/web/components/filings/grid.tsx';
+import {
+  LatestTenKCard,
+} from '../../src/web/components/filings/latest-card.tsx';
+import {
   DEFAULT_LAYOUT,
+  DOCUMENT_LINK_LABEL,
   FILINGS_EMPTY_TITLE,
   FILINGS_LOADING,
   FILINGS_MAX_PAGES,
   FILINGS_PAGE_SIZE,
   filingCountOf,
-  FilingRow,
-  FilingsAccordion,
-  FilingsGrid,
-  FilingsLayoutToggle,
-  FilingsPanel,
-  FilingsView,
   groupByForm,
   IX_VIEWER_LABEL,
-  LatestTenKCard,
   latestTenKOf,
   latestTitleOf,
   loadFilings,
   noFilingsOf,
   TRACKED_FORMS,
-} from '../../src/web/components/filings-view.tsx';
+} from '../../src/web/components/filings/logic.ts';
+import {
+  FilingsLayoutToggle,
+  FilingsPanel,
+} from '../../src/web/components/filings/panel.tsx';
+import {
+  FilingsView,
+} from '../../src/web/components/filings/view.tsx';
 
 const ARCHIVES = 'https://www.sec.gov/Archives/edgar/data/320193';
 
@@ -311,13 +324,21 @@ describe('groupByForm', () => {
 });
 
 describe('FilingRow', () => {
-  test('shows the date and links the primary document to links.document', () => {
+  test('names the primary document, links it to links.document, and dates it on the line below', () => {
     const html = renderToStaticMarkup(<FilingRow filing={TEN_K} />);
-    expect(html).toContain('2025-10-31');
     expect(html).toContain(`href="${ARCHIVES}/000032019325000079/aapl-20251031.htm"`);
-    expect(html).toContain(`>${TEN_K.primaryDocument}</a>`);
+    expect(html).toContain(`>${DOCUMENT_LINK_LABEL}</a>`);
     expect(html).toContain('target="_blank"');
     expect(html).toContain('rel="noopener noreferrer"');
+    expect(html.indexOf(TEN_K.primaryDocument)).toBeGreaterThan(-1);
+    expect(html.indexOf('2025-10-31')).toBeGreaterThan(html.indexOf(TEN_K.primaryDocument));
+  });
+
+  test('is the library\'s Entity stack, with no class string passed', () => {
+    const row = FilingRow({ filing: TEN_K });
+    expect(row.type).toBe(Entity);
+    expect(row.props.layout).toBe('stack');
+    expect(row.props.className).toBeUndefined();
   });
 
   test('adds the ix viewer link when the filing has one', () => {

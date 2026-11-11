@@ -10,34 +10,44 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import { createCompaniesClient, createSummaryClient, summaryPath } from '../../src/web/api.ts';
 import { pageFor } from '../../src/web/app.tsx';
-import { TRACKED_FORMS } from '../../src/web/components/filings-view.tsx';
+import { TRACKED_FORMS } from '../../src/web/components/filings/logic.ts';
 import {
-  AVERAGE_FILINGS_TITLE,
   FILINGS_CHART_LABEL,
   FILINGS_CHART_TITLE,
   filingsChartData,
   FORM_TONES,
+  SummaryChart,
+} from '../../src/web/pages/summary/chart.tsx';
+import {
+  SummaryPage as SummaryPageComponent,
+} from '../../src/web/pages/summary/index.tsx';
+import {
+  AVERAGE_FILINGS_TITLE,
   LATEST_FILING_TITLE,
   NO_LATEST_FILING,
   COMPANIES_LINK_LABEL,
-  REMOVE_CONFIRM_LABEL,
-  REMOVE_LABEL,
-  removeMessage,
   COMPANIES_PATH,
   SUMMARY_EMPTY_DESCRIPTION,
   SUMMARY_EMPTY_TITLE,
   SUMMARY_PAGE_SIZE,
   SUMMARY_TITLE,
-  SummaryChart,
-  summaryColumns,
-  SummaryPage as SummaryPageComponent,
-  SummaryStatCards,
   summaryStats,
-  SummaryTable,
-  SummaryView,
   TOTAL_FILINGS_TITLE,
   withoutCompany,
-} from '../../src/web/pages/summary.tsx';
+} from '../../src/web/pages/summary/logic.ts';
+import {
+  SummaryStatCards,
+} from '../../src/web/pages/summary/stat-cards.tsx';
+import {
+  REMOVE_CONFIRM_LABEL,
+  REMOVE_LABEL,
+  removeMessage,
+  summaryColumns,
+  SummaryTable,
+} from '../../src/web/pages/summary/table.tsx';
+import {
+  SummaryView,
+} from '../../src/web/pages/summary/view.tsx';
 
 import { settle } from './settle.tsx';
 
@@ -71,9 +81,10 @@ function pageOf(items: CompanySummary[]): SummaryPage {
 }
 
 describe('the summary page', () => {
-  test('renders its title and its empty state', () => {
+  test('leaves its title to the topbar and renders its empty state', () => {
     const html = renderToStaticMarkup(<SummaryView />);
-    expect(html).toContain(SUMMARY_TITLE);
+    expect(html).not.toContain('<h1');
+    expect(pageFor('/summary').label).toBe(SUMMARY_TITLE);
     expect(html).toContain(SUMMARY_EMPTY_TITLE);
     expect(html).toContain(SUMMARY_EMPTY_DESCRIPTION);
   });
@@ -275,12 +286,45 @@ describe('the summary chart', () => {
   });
 });
 
+/** The first element in a tree of unrendered elements that `match` accepts, searching every prop. */
+function findElement(node: unknown, match: (element: ReactElement<Record<string, unknown>>) => boolean): ReactElement<Record<string, unknown>> | undefined {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findElement(child, match);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  if (node === null || typeof node !== 'object' || !('props' in node)) return undefined;
+  const element = node as ReactElement<Record<string, unknown>>;
+  if (match(element)) return element;
+  return findElement(Object.values(element.props), match);
+}
+
 describe('the empty selection', () => {
-  test('points to the Companies page with a link to /companies', () => {
+  test('points to the Companies page with a button, not a page-reloading link', () => {
     const html = renderToStaticMarkup(<SummaryView result={pageOf([])} />);
     expect(html).toContain(SUMMARY_EMPTY_TITLE);
-    expect(html).toContain(`href="${COMPANIES_PATH}"`);
-    expect(html).toContain(COMPANIES_LINK_LABEL);
+    expect(html).toMatch(new RegExp(`<button[^>]*>${COMPANIES_LINK_LABEL}</button>`));
+    expect(html).not.toContain(`href="${COMPANIES_PATH}"`);
+  });
+
+  test('the pointer calls onSelectCompanies', () => {
+    let calls = 0;
+    const tree = SummaryView({ result: pageOf([]), onSelectCompanies: () => { calls += 1; } });
+    const button = findElement(tree, (element) => element.type === Button);
+    (button?.props.onClick as () => void)();
+    expect(calls).toBe(1);
+  });
+
+  test('the page moves to /companies through onNavigate', async () => {
+    const visited: string[] = [];
+    const empty = (async () => new Response(JSON.stringify({ success: true, data: pageOf([]) }))) as unknown as typeof fetch;
+    const page = await settle(<SummaryPageComponent api={createSummaryClient(empty)} onNavigate={(path) => visited.push(path)} />);
+    page.stop();
+    const view = (page.tree.props.children as ReactElement<Record<string, unknown>>[])[0] as ReactElement<Record<string, unknown>>;
+    (view.props.onSelectCompanies as () => void)();
+    expect(visited).toEqual([COMPANIES_PATH]);
   });
 
   test('shows no pointer while a company is selected', () => {

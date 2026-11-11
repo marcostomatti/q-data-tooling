@@ -36,7 +36,7 @@ const RATE_LIMIT = { max: 1_000, windowMs: 60_000 } as const;
 const DEFAULT_WEB_DIST = resolve(import.meta.dir, '../web/dist');
 
 /** The paths the web app draws itself, each answered with its `index.html`: `/` lands on `APP.landing.path`. */
-export const APP_PATHS = ['/', '/login', APP.landing.path, '/companies', '/summary', '/tokens'];
+export const APP_PATHS = ['/', '/login', APP.landing.path, '/companies', '/tokens'];
 
 export interface StartOptions {
   /**

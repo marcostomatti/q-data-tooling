@@ -103,10 +103,12 @@ Every `/api` response uses one envelope: `{ "success": true, "data": ... }`, or 
 bun run build:web
 ```
 
-This compiles the web app into `src/web/dist/`, which git ignores. The server checks for that
-folder when it starts, so restart `bun run serve` after building. With the folder present, the
-service serves the web app at `/` and its other pages as well as the API. Without it, the
-service serves the API only and logs `no web bundle found; serving the API only`.
+This compiles the web app into `src/web/dist/`, which git ignores. `bun run serve` runs this
+build before it starts the server, so a restart of `serve` always shows the current source. The
+server reads the folder once, when it starts, so a build made while it runs shows only after a
+restart. With the folder present, the service serves the web app at `/` and its other pages as
+well as the API. Without it (`bun src/http/server.ts` run directly, with no build before it),
+the service serves the API only and logs `no web bundle found; serving the API only`.
 
 ## Configuration
 

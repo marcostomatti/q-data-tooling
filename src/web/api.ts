@@ -27,6 +27,20 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * The message a page shows for a failed call: the error's own message, or the fallback when the
+ * failure is not an `Error`.
+ *
+ * @param failure - What the call threw or rejected with.
+ * @param fallback - The message for a failure that carries none of its own.
+ * @returns The message to show.
+ */
+export function messageOf(failure: unknown, fallback: string): string {
+  return failure instanceof Error
+    ? failure.message
+    : fallback;
+}
+
 type Envelope<T> = { success: true; data: T } | { success: false; error: { name: string; message: string } | string };
 
 /** Calls a same-origin JSON route and returns its `data`, or throws an `ApiError` with the envelope's message. */

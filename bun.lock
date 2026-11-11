@@ -7,7 +7,7 @@
         "@asteasolutions/zod-to-openapi": "^9.1.0",
         "@modelcontextprotocol/sdk": "^1.32.2",
         "@open-tomato/charts": "^0.1.2",
-        "@open-tomato/components": "0.1.1",
+        "@open-tomato/components": "0.2.0",
         "@open-tomato/service": "^2.0.0",
         "@open-tomato/service-express": "^2.0.0",
         "@open-tomato/service-logger": "^2.0.0",
@@ -187,7 +187,7 @@
 
     "@open-tomato/charts": ["@open-tomato/charts@0.1.2", "", { "dependencies": { "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "echarts": "^6.1.0", "tailwind-merge": "^3.7.0", "zod": "^4.1.0" }, "peerDependencies": { "react": "^19.0.0" } }, "sha512-sy1hLxDIyXsZzBToBkSc+95I5ZGDUiXIiY57L1z8arL2OcPtAw/ggQ3D7IQICplBwzVRzkKy6Mk5vRnnud4kMg=="],
 
-    "@open-tomato/components": ["@open-tomato/components@0.1.1", "", { "dependencies": { "@radix-ui/react-accordion": "^1.2.16", "@radix-ui/react-dialog": "^1.1.19", "@radix-ui/react-dropdown-menu": "^2.1.20", "@radix-ui/react-popover": "^1.1.20", "@radix-ui/react-slot": "^1.2.4", "@radix-ui/react-tabs": "^1.1.17", "@radix-ui/react-tooltip": "^1.2.12", "@tanstack/react-query": "^5.103.1", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^1.46.0", "tailwind-merge": "^3.7.0" }, "peerDependencies": { "ioredis": "^6.0.0", "react": "^19.0.0", "react-dom": "^19.0.0" }, "optionalPeers": ["ioredis"] }, "sha512-9qLJregHULRQeFAA3MkSD3Oi9ZaDgbOeGbn31V/wApk69NbKBs82YpOOTKn2tbV4jmEsGoHkUggtIn8gvSHJtw=="],
+    "@open-tomato/components": ["@open-tomato/components@0.2.0", "", { "dependencies": { "@radix-ui/react-accordion": "^1.2.16", "@radix-ui/react-dialog": "^1.1.19", "@radix-ui/react-dropdown-menu": "^2.1.20", "@radix-ui/react-popover": "^1.1.20", "@radix-ui/react-slot": "^1.2.4", "@radix-ui/react-tabs": "^1.1.17", "@radix-ui/react-tooltip": "^1.2.12", "@tanstack/react-query": "^5.103.1", "class-variance-authority": "^0.7.1", "clsx": "^2.1.1", "lucide-react": "^1.46.0", "tailwind-merge": "^3.7.0" }, "peerDependencies": { "ioredis": "^6.0.0", "react": "^19.0.0", "react-dom": "^19.0.0" }, "optionalPeers": ["ioredis"] }, "sha512-E5sOWYU3vlP5bj/Vo916s+UkhLDYemtj1qON5OWUQmmxtziTWZ4UzMl0k6Ee8jANwnoscfBkoFIjpMAD7VIl1w=="],
 
     "@open-tomato/eslint-config": ["@open-tomato/eslint-config@0.1.1", "", { "dependencies": { "@eslint/js": "^9.39.4", "@eslint/markdown": "^8.0.3", "@open-tomato/eslint-plugin": "^0.1.1", "@stylistic/eslint-plugin": "^5.10.0", "@typescript-eslint/parser": "^8.72.0", "eslint-import-resolver-typescript": "^4.4.4", "eslint-plugin-import": "^2.32.0", "eslint-plugin-jsonc": "^3.4.2", "eslint-plugin-jsx-a11y": "^6.10.2", "eslint-plugin-react": "^7.37.5", "eslint-plugin-react-hooks": "^7.1.1", "eslint-plugin-react-refresh": "^0.5.7", "globals": "^17.12.0", "jsonc-eslint-parser": "^3.1.0", "typescript-eslint": "^8.72.0" }, "peerDependencies": { "eslint": "^9.39.0", "typescript": ">=5.8.0" } }, "sha512-IntyUmll0uhpInkxwadHCtrNvBw+s1UPLs2+ByCUf5dNzG0MznC6Vwe2//rdbwRY446PFM4MOxj6yS7DDNw2+w=="],
 

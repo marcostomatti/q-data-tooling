@@ -10,6 +10,9 @@ const MAX_PASSES = 10;
 
 interface PendingEffect { readonly slot: number, readonly run: () => void | (() => void), readonly deps: readonly unknown[] | undefined }
 
+/** A `useCallback` result held across passes, with the deps it was made for. */
+interface Memo { readonly value: unknown, readonly deps: readonly unknown[] }
+
 /** A driven component: its last tree, a `flush` that renders again until quiet, and a `stop` that runs the live cleanups. */
 export interface Settled {
   tree: ReactElement<Record<string, unknown>>
@@ -18,8 +21,10 @@ export interface Settled {
 }
 
 /**
- * Drives a component with `useState` and `useEffect` and no DOM: renders, runs the effects whose
- * deps changed, lets the promises they started settle, and renders again until nothing changes.
+ * Drives a component with `useState`, `useEffect` and `useCallback` and no DOM: renders, runs the
+ * effects whose deps changed, lets the promises they started settle, and renders again until
+ * nothing changes. A `useCallback` hands back the same function while its deps are unchanged, as
+ * React does, so an effect that depends on it does not run again on every pass.
  *
  * @param element - The element to drive; its type is called as a plain function.
  * @returns The driven component, as {@link Settled} lists it.
@@ -28,6 +33,7 @@ export async function settle(element: ReactElement<Record<string, unknown>>): Pr
   const state: unknown[] = [];
   const lastDeps: Array<readonly unknown[] | undefined> = [];
   const cleanups: Array<void | (() => void)> = [];
+  const memos: Memo[] = [];
   let pending: PendingEffect[] = [];
   let dirty = false;
   const settled: Settled = {
@@ -41,6 +47,7 @@ export async function settle(element: ReactElement<Record<string, unknown>>): Pr
     for (let pass = 0; pass < MAX_PASSES; pass += 1) {
       let stateSlot = 0;
       let effectSlot = 0;
+      let memoSlot = 0;
       dirty = false;
       const previous = INTERNALS.H;
       INTERNALS.H = {
@@ -62,6 +69,13 @@ export async function settle(element: ReactElement<Record<string, unknown>>): Pr
           const before = lastDeps[slot];
           const changed = deps === undefined || before === undefined || deps.some((dep, index) => !Object.is(dep, before[index]));
           if (changed) pending.push({ slot, run, deps });
+        },
+        useCallback: (callback: unknown, deps: readonly unknown[]) => {
+          const slot = memoSlot++;
+          const before = memos[slot];
+          if (before !== undefined && deps.every((dep, index) => Object.is(dep, before.deps[index]))) return before.value;
+          memos[slot] = { value: callback, deps };
+          return callback;
         },
       };
       try {

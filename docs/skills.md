@@ -100,7 +100,7 @@ fail until their lists match.
 
 **Run after.** Run
 `bun run typecheck && bun run lint && bun test tests/web tests/http/server.test.ts`. To see the page
-in the app, run `bun run build:web` and restart `bun run serve`, as [the web
+in the app, restart `bun run serve`, which builds the app first, as [the web
 build](setup.md#the-web-build) describes.
 
 **Example.** Run `/fe empty-page reports`, with the label `Reports` and an icon such as `house`. The
