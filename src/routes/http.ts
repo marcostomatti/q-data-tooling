@@ -13,13 +13,14 @@ import { docsOperations, docsRouter } from '../http/docs.ts';
 import { API_PREFIX, buildOpenApiDocument, HEALTH_OPERATION } from '../http/openapi.ts';
 import { lazyLogger, type Log } from '../logging.ts';
 
+import { companyRoutes } from './companies/http.ts';
 import { infoRoute } from './info/http.ts';
 
 /**
  * Every internal HTTP route, each mounted under `/api`. `service_info` is the reference route a
- * new one copies; a route added here is mounted with it.
+ * new one copies; a route added here is mounted with it. The companies routes follow it.
  */
-export const ROUTES: readonly RouteSpec[] = [infoRoute];
+export const ROUTES: readonly RouteSpec[] = [infoRoute, ...companyRoutes];
 
 /**
  * The OpenAPI document the service serves: every route in `ROUTES`, and beside them the fixed

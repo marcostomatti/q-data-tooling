@@ -26,14 +26,16 @@ Turn it on when an agent should call the service. Two transports carry it:
 
 ### The tools
 
-`ALL_TOOLS` in `src/routes/tools.ts` lists the tools every server offers. It holds one today:
+`ALL_TOOLS` in `src/routes/tools.ts` lists the tools every server offers. It holds three today:
 
 | Tool | Title | What it returns |
 | --- | --- | --- |
 | `service_info` | Service info | The service id, name and version, the database dialect (`sqlite` or `pg`) and whether the notebook tools are on. It takes no arguments and only reads. |
+| `company_list` | List companies | One page of companies with the total across every page, matched by ticker prefix or name with `q` and filtered by `selected`. It only reads. |
+| `company_update` | Update a company | The company with `ticker`, after setting whether it is in the summary from the required `selected` flag. It fails when no company trades under the ticker. |
 
 When `OPEN_NOTEBOOK_URL` is set and the notebook answers at startup, `src/mcp/server.ts` adds eight
-more after `service_info`. They are the [Open Notebook](open-notebook.md) tools:
+more after those. They are the [Open Notebook](open-notebook.md) tools:
 
 - `notebook_list` and `notebook_create` list and create notebooks.
 - `notebook_source_list`, `notebook_source_get`, `notebook_source_add_text` and
