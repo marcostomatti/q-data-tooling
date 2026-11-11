@@ -5,7 +5,8 @@
  * among them, must arrive on stderr instead.
  *
  * The server runs as a child and is never imported: `createMCP` starts on call and exits the
- * process if setup throws.
+ * process if setup throws. It reads `SEC_USER_AGENT` before it opens anything, so the child is
+ * given a made-up one, and a second run without it shows the start refused.
  *
  * @module
  */
@@ -17,6 +18,9 @@ import { REPO_ROOT } from '../docs/markdown';
 /** Long enough for a cold `bun` start; the server exits on its own once stdin ends. */
 const EXIT_WAIT_MS = 10_000;
 const TEST_TIMEOUT_MS = 15_000;
+
+/** A made-up User-Agent of the shape the server checks; no test here reaches SEC. */
+const TEST_SEC_USER_AGENT = 'q-data-tooling stdio tests tests@example.com';
 
 /** The messages a client sends: the opening, a `tools/list`, then a call of `service_info`. */
 const REQUESTS = [
@@ -43,13 +47,19 @@ function parsedLines(text: string): ReadonlyArray<Line | string> {
     });
 }
 
-/** Runs the stdio server over `REQUESTS` and returns what it wrote to each stream. */
-async function runStdioServer(): Promise<{ readonly stdout: string, readonly stderr: string, readonly exitCode: number }> {
+/**
+ * Runs the stdio server over `REQUESTS` and returns what it wrote to each stream.
+ *
+ * @param secUserAgent - The `SEC_USER_AGENT` the child is given, {@link TEST_SEC_USER_AGENT} by default.
+ * @returns What the child wrote to stdout and stderr, and its exit code.
+ */
+async function runStdioServer(secUserAgent = TEST_SEC_USER_AGENT): Promise<{ readonly stdout: string, readonly stderr: string, readonly exitCode: number }> {
   const child = Bun.spawn([process.execPath, 'src/mcp/server.ts'], {
     cwd: REPO_ROOT,
     env: {
       ...process.env,
       MCP_TRANSPORT: 'stdio',
+      SEC_USER_AGENT: secUserAgent,
       DATABASE_URL: ':memory:',
       OPEN_NOTEBOOK_URL: '',
       LOG_LEVEL: 'debug',
@@ -89,5 +99,13 @@ describe('the stdio MCP server', () => {
       : line.id))).toEqual([1, 2, 3]);
     expect(logs.some((line) => line.msg === 'registered MCP tools')).toBe(true);
     expect(typeof toolLine?.traceId).toBe('string');
+  }, TEST_TIMEOUT_MS);
+
+  test('refuses to start with a blank SEC_USER_AGENT, naming it on stderr and answering nothing', async () => {
+    const { stdout, stderr, exitCode } = await runStdioServer('');
+
+    expect(exitCode).toBe(1);
+    expect(stdout).toBe('');
+    expect(stderr).toContain('SEC_USER_AGENT is not set');
   }, TEST_TIMEOUT_MS);
 });

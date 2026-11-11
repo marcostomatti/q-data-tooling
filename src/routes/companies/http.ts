@@ -2,6 +2,7 @@ import type { RouteSpec } from '../../http/route.ts';
 
 import { route } from '../../http/route.ts';
 import { inDomain } from '../../logging.ts';
+import { syncSourcesFor } from '../filings/repository.ts';
 
 import { CompanyListInput, CompanyListOutput, CompanyUpdateInput, CompanyUpdateOutput, DOMAIN } from './contract.ts';
 import { listCompanies } from './list.flow.ts';
@@ -27,7 +28,7 @@ export const companyListRoute = route('get', '/companies', 'company_list', Compa
 export const companyUpdateRoute = route('patch', '/companies/:ticker', 'company_update', CompanyUpdateInput, {
   summary: 'Sets whether the company with the ticker is in the summary, from the required selected flag.',
   output: CompanyUpdateOutput,
-}, async (input, { db, log }) => updateCompany(input, { store: companyStore(db), log: inDomain(log, DOMAIN) }));
+}, async (input, { db, log, sec }) => updateCompany(input, { store: companyStore(db), sync: syncSourcesFor(db, sec), log: inDomain(log, DOMAIN) }));
 
 /** The companies routes, in the order `ROUTES` lists them. */
 export const companyRoutes: readonly RouteSpec[] = [companyListRoute, companyUpdateRoute];

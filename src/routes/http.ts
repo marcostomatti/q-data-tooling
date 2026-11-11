@@ -3,6 +3,7 @@ import type { AuthMode } from '../auth/contract.ts';
 import type { Db } from '../data/repositories/db.ts';
 import type { OpenApiDocument } from '../http/openapi.ts';
 import type { RouteSpec } from '../http/route.ts';
+import type { SecClient } from '../sec/client.ts';
 
 import { Router, type Application } from 'express';
 
@@ -52,11 +53,26 @@ export function serviceDocument(mode: AuthMode): OpenApiDocument {
  *
  * `log` is the base log every route's handler is built with and hands to its `run`; it defaults
  * to the `http` logger, and a test passes a capturing fake. `authMode` is the sign-in mode the
- * document lists the `/auth` routes of; it defaults to `none`, the mode with no sign-in.
+ * document lists the `/auth` routes of; it defaults to `none`, the mode with no sign-in. `sec`
+ * is the SEC client the server built once, handed to every route's `run`; left out, the filings
+ * and companies routes read the stored rows only and never call SEC.
+ *
+ * @param app - The app to mount on.
+ * @param db - The database every route's `run` is handed.
+ * @param log - The base log every route's handler is built with.
+ * @param authMode - The sign-in mode the document lists the `/auth` routes of.
+ * @param sec - The SEC client every route's `run` is handed, or `undefined`.
+ * @throws {Error} If a route in `ROUTES` cannot be documented; the message names it.
  */
-export function mountRoutes(app: Application, db: Db, log: Log = lazyLogger('http')(), authMode: AuthMode = 'none'): void {
+export function mountRoutes(
+  app: Application,
+  db: Db,
+  log: Log = lazyLogger('http')(),
+  authMode: AuthMode = 'none',
+  sec?: SecClient,
+): void {
   const api = Router();
-  for (const spec of ROUTES) api[spec.method](spec.path, spec.handler(db, log));
+  for (const spec of ROUTES) api[spec.method](spec.path, spec.handler(db, log, sec));
   api.use(docsRouter(serviceDocument(authMode), API_PREFIX));
   app.use(API_PREFIX, api);
 }

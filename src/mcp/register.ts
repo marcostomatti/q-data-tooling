@@ -1,5 +1,6 @@
 import type { Db } from '../data/repositories/db.ts';
 import type { Log } from '../logging.ts';
+import type { SecClient } from '../sec/client.ts';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult, ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import type { z, ZodType } from 'zod';
@@ -11,12 +12,14 @@ import { TRACE_ID_FIELD } from '../logging.ts';
 import { errorResult, okResult } from './result.ts';
 
 /**
- * What a tool's `run` receives beside its parsed input: the database and the call's log, a
- * child of the base log bound to that call's own `traceId`.
+ * What a tool's `run` receives beside its parsed input: the database, the call's log, a child of
+ * the base log bound to that call's own `traceId`, and the SEC client the server built, which is
+ * absent when the tools were registered without one.
  */
 export interface ToolRunContext {
   readonly db: Db
   readonly log: Log
+  readonly sec?: SecClient
 }
 
 /**
@@ -82,12 +85,24 @@ export function defineTool<S extends ZodType>(spec: ToolSpec<S>): ToolDefinition
  * stdio, where stdout carries the protocol. Each call binds a fresh `crypto.randomUUID()` as
  * `traceId` on a child of it and hands that child to `run` with the database, so every line one
  * call writes carries the same id and no two calls share one. A test passes a capturing fake.
+ *
+ * `sec` is the SEC client the entry point built once, handed to every `run` as it is, so every
+ * call syncs through the one shared client and its request spacing. Left out, `run` receives
+ * `undefined` and no tool reaches SEC; a test passes a client over a stub `fetch`.
+ *
+ * @param server - The server to register on.
+ * @param db - The database every `run` is handed.
+ * @param definitions - The tools to register.
+ * @param log - The base log each call's log is a child of.
+ * @param sec - The SEC client every `run` is handed, or `undefined`.
+ * @throws When two definitions share a name.
  */
 export function registerTools(
   server: McpServer,
   db: Db,
   definitions: readonly ToolDefinition[],
   log: Log,
+  sec?: SecClient,
 ): void {
   for (const definition of definitions) {
     server.registerTool(
@@ -103,7 +118,7 @@ export function registerTools(
       async (args: unknown): Promise<CallToolResult> => {
         const traced = log.child({ [TRACE_ID_FIELD]: randomUUID() });
         try {
-          return okResult(await definition.run(args, { db, log: traced }));
+          return okResult(await definition.run(args, { db, log: traced, sec }));
         } catch (error: unknown) {
           return errorResult(error);
         }

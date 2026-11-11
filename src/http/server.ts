@@ -13,6 +13,7 @@ import { DEFAULT_BACKUP_DIR, startBackupSchedule, type BackupWiring } from '../b
 import { dbDependency, getDb } from '../data/active.ts';
 import { inDomain, lazyLogger, scoped, type Log } from '../logging.ts';
 import { mountRoutes } from '../routes/http.ts';
+import { createSecClient } from '../sec/client.ts';
 import { readSecUserAgent } from '../sec/config.ts';
 
 const MAX_PORT = 65_535;
@@ -159,7 +160,8 @@ function startBackups(db: ReturnType<typeof getDb>, wiring: BackupWiring | undef
 export async function startService(opts: StartOptions = {}): Promise<ServiceHandle> {
   // All are read before anything opens, so a wrong setting stops the start with its own message.
   // The SEC User-Agent goes first: without it no filings sync could succeed, whatever opens /api.
-  readSecUserAgent(process.env);
+  // The one SEC client is built here and shared by every route, so its spacing covers them all.
+  const sec = createSecClient({ fetch, userAgent: readSecUserAgent(process.env) });
   const auth = parseAuthConfig(process.env);
   const apiKey = configuredApiKey(process.env, auth);
   const port = resolvePort(opts.port, process.env);
@@ -184,7 +186,7 @@ export async function startService(opts: StartOptions = {}): Promise<ServiceHand
       }
       app.use('/auth', authRouter(db, auth));
       app.use('/api', requireApiAccess(db, apiKey));
-      mountRoutes(app, db, undefined, auth.mode);
+      mountRoutes(app, db, undefined, auth.mode, sec);
       if (existsSync(webDist)) {
         app.use(express.static(webDist));
         // The app routes in the browser, so a reload on /tokens or the landing page gets the page and not a 404.

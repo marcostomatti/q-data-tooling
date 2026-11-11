@@ -3,7 +3,7 @@ import { defineTool, type ToolDefinition } from '../../mcp/register.ts';
 
 import { DOMAIN, FilingListInput, SummaryInput } from './contract.ts';
 import { listFilings } from './list.flow.ts';
-import { companyLookupStore, filingStore } from './repository.ts';
+import { companyLookupStore, filingStore, syncSourcesFor } from './repository.ts';
 import { summarizeFilings } from './summary.flow.ts';
 
 /**
@@ -21,7 +21,12 @@ export const filingListTool: ToolDefinition = defineTool({
     'default), and `page` and `pageSize` choose the page. Fails when no company trades under the ticker.',
   input: FilingListInput,
   annotations: { readOnlyHint: true, openWorldHint: false },
-  run: async (input, { db, log }) => listFilings(input, { companies: companyLookupStore(db), filings: filingStore(db), log: inDomain(log, DOMAIN) }),
+  run: async (input, { db, log, sec }) => listFilings(input, {
+    companies: companyLookupStore(db),
+    filings: filingStore(db),
+    sync: syncSourcesFor(db, sec),
+    log: inDomain(log, DOMAIN),
+  }),
 });
 
 /**

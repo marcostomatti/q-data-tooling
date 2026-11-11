@@ -1,5 +1,6 @@
 import type { Db } from '../../src/data/repositories/db.ts';
 import type { Log } from '../../src/logging.ts';
+import type { SecClient } from '../../src/sec/client.ts';
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -26,10 +27,16 @@ export interface ToolClient {
  * Registers the definitions on a bare server and connects a client to it, so a call crosses the
  * same schema validation and the same result envelope a real client's call does. `log` is the
  * base log each `run` is handed; a test that reads the lines passes its own capturing fake.
+ * `sec` is the SEC client each `run` is handed; left out, no tool reaches SEC.
  */
-export async function connectTools(definitions: readonly ToolDefinition[], db: Db, log: Log = captureLog().log): Promise<ToolClient> {
+export async function connectTools(
+  definitions: readonly ToolDefinition[],
+  db: Db,
+  log: Log = captureLog().log,
+  sec?: SecClient,
+): Promise<ToolClient> {
   const server = new McpServer({ name: 'test', version: '0.0.0' });
-  registerTools(server, db, definitions, log);
+  registerTools(server, db, definitions, log, sec);
   const client = new Client({ name: 'test-client', version: '0.0.0' });
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   await Promise.all([server.connect(serverSide), client.connect(clientSide)]);

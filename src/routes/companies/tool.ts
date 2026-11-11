@@ -1,5 +1,6 @@
 import { inDomain } from '../../logging.ts';
 import { defineTool, type ToolDefinition } from '../../mcp/register.ts';
+import { syncSourcesFor } from '../filings/repository.ts';
 
 import { CompanyListInput, CompanyUpdateInput, DOMAIN } from './contract.ts';
 import { listCompanies } from './list.flow.ts';
@@ -37,7 +38,7 @@ export const companyUpdateTool: ToolDefinition = defineTool({
     'call changes nothing. Fails when no company trades under the ticker.',
   input: CompanyUpdateInput,
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  run: async (input, { db, log }) => updateCompany(input, { store: companyStore(db), log: inDomain(log, DOMAIN) }),
+  run: async (input, { db, log, sec }) => updateCompany(input, { store: companyStore(db), sync: syncSourcesFor(db, sec), log: inDomain(log, DOMAIN) }),
 });
 
 /** The companies tools, in the order of their routes in `companyRoutes`. */

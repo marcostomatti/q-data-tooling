@@ -2,18 +2,22 @@
  * The stores the filings flows read through their injected `deps`: one method per store call
  * they make, each a call into a shared repository over the `Db` the route or the tool was
  * handed. The companies lookup reads `src/data/repositories/companies.ts` and the filings store
- * reads `src/data/repositories/filings.ts`. Both read stored rows only; nothing here calls SEC.
+ * reads `src/data/repositories/filings.ts`. Both read stored rows only. The sync sources
+ * {@link syncSourcesFor} builds write through the same repositories and hold the SEC client they
+ * are handed; nothing here builds an SEC client of its own.
  *
  * @module
  */
 
 import type { FilingPageQuery, FilingSlice } from './list.flow.ts';
 import type { SummaryQuery, SummarySlice } from './summary.flow.ts';
+import type { FilingSyncSources } from './sync.flow.ts';
 import type { Db } from '../../data/repositories/db.ts';
 import type { Company } from '../../entities/company.ts';
+import type { SecClient } from '../../sec/client.ts';
 
-import { findCompanyByTicker } from '../../data/repositories/companies.ts';
-import { pageFilings, summarizeSelectedFilings } from '../../data/repositories/filings.ts';
+import { findCompanyByTicker, updateCompanyHeader } from '../../data/repositories/companies.ts';
+import { deleteFilingsBefore, insertFilings, pageFilings, summarizeSelectedFilings } from '../../data/repositories/filings.ts';
 
 /** The store {@link companyLookupStore} builds: it fits `ListFilingsDeps['companies']` by shape. */
 export interface CompanyLookupStore {
@@ -69,5 +73,29 @@ export function filingStore(db: Db): FilingStore {
   return {
     page: async (query) => pageFilings(db, query),
     summary: async (query) => summarizeSelectedFilings(db, query),
+  };
+}
+
+/**
+ * The sources a sync of one company reads and writes through, for the `sync` of the filings list
+ * flow's and the companies update flow's deps: the SEC client as it is handed, the header write
+ * of `updateCompanyHeader`, the insert and delete of the shared filings repository over `db`, and
+ * the system clock. With no client there is nothing to sync from, so the answer is `undefined`
+ * and the flows read and write the stored rows only.
+ *
+ * @param db - The client or open transaction the stores write through.
+ * @param sec - The SEC client the route or the tool was handed, or `undefined`.
+ * @returns The sync sources, or `undefined` when `sec` is.
+ */
+export function syncSourcesFor(db: Db, sec: SecClient | undefined): FilingSyncSources | undefined {
+  if (sec === undefined) return undefined;
+  return {
+    sec,
+    companies: { updateHeader: async (cik, header) => updateCompanyHeader(db, cik, header) },
+    filings: {
+      insert: async (rows) => insertFilings(db, rows),
+      deleteBefore: async (cik, cutoff) => deleteFilingsBefore(db, cik, cutoff),
+    },
+    now: () => new Date(),
   };
 }

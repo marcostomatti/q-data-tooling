@@ -40,9 +40,9 @@ Then open the address `serve` prints and sign in at `/login` with that password.
 - **The database** file is created by `db:migrate`, not by `serve`, so run it again after pulling
   new migrations. `db:seed` can run any number of times; it skips rows already there.
 
-`db:seed` and `SEC_USER_AGENT` describe the finished service. Until the seed and the SEC client
-are built ([spec](docs/specs/sec-filings.md), stages 2 and 3), the seed runs no files and the
-variable is not read.
+`serve` and `mcp` both read `SEC_USER_AGENT` before they open anything and refuse to start
+without it. The filings list and `selected: true` sync a company's filings from SEC through the
+one client each builds ([spec](docs/specs/sec-filings.md)).
 
 ## API docs
 
