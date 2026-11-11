@@ -42,9 +42,9 @@ describe('openMigratedMemoryDb', () => {
 
     // Assert
     expect(db.$client.filename).toBe(':memory:');
-    expect(tableNames(db)).toEqual([MIGRATIONS_TABLE, 'api_token', 'app_config', 'auth_session', 'companies']);
+    expect(tableNames(db)).toEqual([MIGRATIONS_TABLE, 'api_token', 'app_config', 'auth_session', 'companies', 'company_tickers']);
     const recorded = db.$client.query<{ count: number }, []>(`select count(*) as count from ${MIGRATIONS_TABLE}`).get();
-    expect(recorded?.count).toBe(2);
+    expect(recorded?.count).toBe(3);
   });
 
   test('gives each call a database of its own', () => {

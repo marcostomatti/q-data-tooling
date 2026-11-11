@@ -110,9 +110,10 @@ migration per dialect; commit the generated files with the schema. The seed runn
 list reads stored rows only until the SEC fetching stage adds the sync.
 ```
 
-- [ ] Add the `companies` table with `/db add companies` per "DB tables", both dialects, with its generated drizzle migrations  {agent=loop-implementer effort=medium skills=db tests=module}
+- [x] Add the `companies` table with `/db add companies` per "DB tables", both dialects, with its generated drizzle migrations  {agent=loop-implementer effort=medium skills=db tests=module}
   - Note: `companies` lives in `src/data/<dialect>/tables/companies.ts`; `company_tickers` belongs in the same file. Migrations `0001_add-companies` in both `drizzle/` folders. `db:migrate` was not run against `data/` (the plan forbids editing it); the migrated `:memory:` tests apply it instead.
 - [ ] Add the `company_tickers` table with `/db add company_tickers` per "DB tables", both dialects, with its generated drizzle migrations  {agent=loop-implementer effort=medium skills=db tests=module}
+  - Note: `companyTickers` sits beside `companies` in `src/data/<dialect>/tables/companies.ts`; `cik` is `notNull` with `onDelete: 'cascade'` (Postgres only, SQLite runs FKs off). Migrations `0002_add-company_tickers` in both `drizzle/` folders; no index on `company_tickers.cik` beyond what "DB tables" names. `db:migrate` not run against `data/`.
 - [ ] Add the `filings` table with `/db add filings` per "DB tables", including the `(cik, filing_date DESC)` and `(cik, base_form)` indexes, both dialects, with its generated drizzle migrations  {agent=loop-implementer effort=medium skills=db tests=module}
 - [ ] Copy `.tmp/company_tickers.json` to `src/data/seeds/data/company_tickers.json`, reading no other file under `.tmp/`  {tools=Read,Bash model=haiku effort=low}
 - [ ] Add the seed `src/data/seeds/01-companies.ts` per "Seed": validate with `TickerFile`, one company per CIK with the first ticker as primary, every ticker in `company_tickers`, chunks of 500 with `onConflictDoNothing`, with unit tests over a small inline ticker list  {agent=loop-implementer effort=high skills=db}

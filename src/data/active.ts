@@ -9,4 +9,4 @@
  *
  * @module
  */
-export { apiToken, appConfig, authSession, closeDb, companies, dbDependency, DIALECT, getDb, transact, type DrizzleClient as ActiveClient } from '#db';
+export { apiToken, appConfig, authSession, closeDb, companies, companyTickers, dbDependency, DIALECT, getDb, transact, type DrizzleClient as ActiveClient } from '#db';

@@ -37,3 +37,16 @@ export const companies = pgTable('companies', {
   index('companies_name_idx').on(table.name),
   index('companies_selected_idx').on(table.selected),
 ]);
+
+/**
+ * Every ticker `company_tickers.json` lists, each pointing at the company that trades under it.
+ * A company with several tickers, such as CIK 2809 with `AEM` and `AEMRF`, has one row per
+ * ticker, so a secondary ticker resolves to the same company as its primary.
+ */
+export const companyTickers = pgTable('company_tickers', {
+  /** The ticker as the SEC spells it: the primary key. */
+  ticker: text().primaryKey(),
+  /** The CIK of the company the ticker belongs to; deleting the company deletes its tickers. */
+  cik: integer().notNull()
+    .references(() => companies.cik, { onDelete: 'cascade' }),
+});

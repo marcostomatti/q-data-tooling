@@ -35,13 +35,13 @@ beforeEach(async () => {
 });
 
 describe('the SQLite schema', () => {
-  test('declares only the auth tables, the app-config table and companies', () => {
+  test('declares only the auth tables, the app-config table, companies and company_tickers', () => {
     const query = 'select name from sqlite_master where type = \'table\' and name not like \'sqlite_%\' order by name';
     const tables = db.$client
       .query<{ name: string }, []>(query)
       .all()
       .map((row) => row.name);
-    expect(tables).toEqual(['api_token', 'app_config', 'auth_session', 'companies']);
+    expect(tables).toEqual(['api_token', 'app_config', 'auth_session', 'companies', 'company_tickers']);
   });
 
   test('the index exports its dialect, the client, the dependency and the tables', () => {
@@ -53,6 +53,7 @@ describe('the SQLite schema', () => {
       'authSession',
       'closeDb',
       'companies',
+      'companyTickers',
       'dbDependency',
       'getDb',
       'transact',
@@ -189,5 +190,44 @@ describe('the SQLite schema', () => {
 
     // Assert
     expect(indexes).toEqual(['companies_cik10_unique', 'companies_name_idx', 'companies_selected_idx']);
+  });
+
+  test('company_tickers resolves a primary and a secondary ticker to the same company', () => {
+    // Arrange
+    db.insert(companies.companies).values({ cik: 2809, cik10: '0000002809', ticker: 'AEM', name: 'AGNICO EAGLE MINES LTD' })
+      .run();
+    db.insert(companies.companyTickers).values([{ ticker: 'AEM', cik: 2809 }, { ticker: 'AEMRF', cik: 2809 }])
+      .run();
+
+    // Act
+    const rows = db.select().from(companies.companyTickers)
+      .orderBy(companies.companyTickers.ticker)
+      .all();
+
+    // Assert
+    expect(rows).toEqual([{ ticker: 'AEM', cik: 2809 }, { ticker: 'AEMRF', cik: 2809 }]);
+  });
+
+  test('company_tickers refuses a second row with the same ticker', () => {
+    // Arrange
+    db.insert(companies.companyTickers).values({ ticker: 'AEM', cik: 2809 })
+      .run();
+
+    // Act
+    const duplicate = () => db.insert(companies.companyTickers).values({ ticker: 'AEM', cik: 320193 })
+      .run();
+
+    // Assert
+    expect(duplicate).toThrow(/UNIQUE/);
+  });
+
+  test('company_tickers keys cik to companies.cik with a cascading delete', () => {
+    // Act
+    const keys = db.$client
+      .query<{ table: string; from: string; to: string; on_delete: string }, []>('select "table", "from", "to", on_delete from pragma_foreign_key_list(\'company_tickers\')')
+      .all();
+
+    // Assert
+    expect(keys).toEqual([{ table: 'companies', from: 'cik', to: 'cik', on_delete: 'CASCADE' }]);
   });
 });
