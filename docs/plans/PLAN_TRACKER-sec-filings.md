@@ -205,7 +205,7 @@ page's own `tests/web/companies.test.tsx`; no visual or screenshot tests. The na
 ```
 
 - [x] Scaffold the Companies page with `/fe empty-page companies`  {agent=loop-implementer effort=low skills=fe tests=module}
-- [ ] Add the Companies page `Toolbar` with a debounced `q` search, a selected-only filter and pagination controls over `GET /companies`  {agent=loop-implementer effort=medium}
+- [x] Add the Companies page `Toolbar` with a debounced `q` search, a selected-only filter and pagination controls over `GET /companies`  {agent=loop-implementer effort=medium}
   - Close-out: `CompaniesToolbar` in `src/web/pages/companies.tsx` holds `SearchInput` (300 ms
     debounce into `q`), a `Selected only` `Checkbox` (sends `selected=true` or nothing) and
     Previous/Next `Button`s around `Page n of N`; the library `Pagination` draws one button per
@@ -214,6 +214,16 @@ page's own `tests/web/companies.test.tsx`; no visual or screenshot tests. The na
     empty state today. The debounce timer itself has no test: `renderToStaticMarkup` runs no
     effects and the repo has no DOM test environment.
 - [ ] Add the Companies page rows, one `RowStatCard` per company on the stats-only story with the name as a `ghost` `Button` calling `onOpenFilings` and a `Switch` sending `PATCH selected` with an explicit boolean, falling back to `DecoratedToggle`, then `OptionCard`, then a `Table` with a toggle column  {agent=loop-implementer effort=high}
+  - Close-out: `CompanyRow` in `src/web/pages/companies.tsx` is a `RowStatCard` (stats-only
+    story): ticker as `title`, the name as a `ghost` `Button` in `subtitle` calling
+    `onOpenFilings(ticker)`, ministats `cik`, `exchange` and `synced`, and a `Switch` in `action`
+    calling `onSelectedChange(ticker, next)`. `RowStatCard`'s `title` is typed `string`, so the
+    button cannot sit there; `subtitle` and `action` take a `ReactNode`. No fallback was needed:
+    `DecoratedToggle` and `OptionCard` both render a root `<button>` (measured with
+    `renderToStaticMarkup` on the installed 0.1.1), so a `Button` inside would nest. The client's
+    `select(ticker, selected)` in `src/web/api.ts` sends `PATCH /api/companies/:ticker` with
+    `{ selected }`; `withCompany` puts the server's answer into the page. `CompaniesPage` takes
+    `onOpenFilings` for the Filings view stage to wire; `PAGES` does not pass it yet.
 - [ ] Add render tests showing an API error on the Companies page shows a message rather than an empty list, rows render from the API stub, and the switch sends the `PATCH` with an explicit boolean  {agent=tdd-guide effort=medium tests=module}
 - [ ] Run the Companies page gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}
 

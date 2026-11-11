@@ -6,7 +6,7 @@ import type {
   SignInState,
   TokenSummary,
 } from '../auth/contract.ts';
-import type { CompanyListOutput } from '../routes/companies/contract.ts';
+import type { CompanyListOutput, CompanyUpdateInput, CompanyUpdateOutput } from '../routes/companies/contract.ts';
 
 export type { AuthMode, CreatedToken, SessionState, SignInState, TokenSummary } from '../auth/contract.ts';
 
@@ -99,6 +99,9 @@ export interface CompanyQuery {
 /** One page of companies, the `z.infer` type of `CompanyListOutput` in `src/routes/companies/contract.ts`. */
 export type CompanyPage = CompanyListOutput;
 
+/** One company as the server answers it, the `z.infer` type of `CompanyUpdateOutput`. */
+export type Company = CompanyUpdateOutput;
+
 /**
  * Builds the `GET /api/companies` path for a query. A blank `q` is left out, because the route
  * refuses an empty one, and `selected` is sent only as `true`: the page filters to the selected
@@ -116,15 +119,31 @@ export function companiesPath(query: CompanyQuery): string {
 }
 
 /**
+ * The `PATCH` path of one company, its ticker encoded so a `/` or `?` in it stays in the segment.
+ *
+ * @param ticker - The company's ticker, such as `AAPL`.
+ * @returns The path, such as `/api/companies/AAPL`.
+ */
+export function companyPath(ticker: string): string {
+  return `/api/companies/${encodeURIComponent(ticker)}`;
+}
+
+/**
  * The `/api/companies` calls, each going through `fetchImpl`, so a test can hand in a stand-in.
- * The answer type is imported as a type only, so the bundle does not carry zod for it.
+ * The answer types are imported as types only, so the bundle does not carry zod for them.
  *
  * @param fetchImpl - The `fetch` every call goes through.
- * @returns The client, whose `list` resolves to one page of companies or throws an `ApiError`.
+ * @returns The client, whose `list` resolves to one page of companies and whose `select` sends
+ *   `PATCH /api/companies/:ticker` with the explicit `selected` boolean, never a toggle, and
+ *   resolves to the company as it stands after; either throws an `ApiError` on a refusal.
  */
 export function createCompaniesClient(fetchImpl: typeof fetch) {
   return {
     list: (query: CompanyQuery): Promise<CompanyPage> => request('GET', companiesPath(query), undefined, fetchImpl),
+    select: (ticker: string, selected: CompanyUpdateInput['selected']): Promise<Company> => {
+      const body = { selected } satisfies Pick<CompanyUpdateInput, 'selected'>;
+      return request('PATCH', companyPath(ticker), body, fetchImpl);
+    },
   };
 }
 

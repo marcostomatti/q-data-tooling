@@ -4,6 +4,7 @@ import {
   ApiError,
   auth,
   companiesPath,
+  companyPath,
   createAuthClient,
   createCompaniesClient,
   request,
@@ -151,5 +152,24 @@ describe('createCompaniesClient', () => {
     const query: CompanyQuery = { page: 1, pageSize: 25, q: 'aapl', selectedOnly: false };
     expect(await createCompaniesClient(fetchImpl).list(query)).toEqual(page);
     expect(calls.map((call) => `${call.init.method} ${call.path}`)).toEqual(['GET /api/companies?page=1&pageSize=25&q=aapl']);
+  });
+
+  test('select PATCHes the ticker with the explicit flag, false included, and the csrf header', async () => {
+    const company = { ticker: 'AAPL', selected: false };
+    const { fetchImpl, calls } = stubFetch(JSON.stringify({ success: true, data: company }));
+    expect(await createCompaniesClient(fetchImpl).select('AAPL', false)).toEqual(company as never);
+    await createCompaniesClient(fetchImpl).select('AAPL', true);
+    expect(calls.map((call) => `${call.init.method} ${call.path} ${String(call.init.body)}`)).toEqual([
+      'PATCH /api/companies/AAPL {"selected":false}',
+      'PATCH /api/companies/AAPL {"selected":true}',
+    ]);
+    expect(headersOf(calls[0])['x-app-csrf']).toBe('1');
+  });
+});
+
+describe('companyPath', () => {
+  test('encodes the ticker into one path segment', () => {
+    expect(companyPath('AAPL')).toBe('/api/companies/AAPL');
+    expect(companyPath('BRK/B')).toBe('/api/companies/BRK%2FB');
   });
 });

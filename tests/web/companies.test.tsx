@@ -1,4 +1,5 @@
-import type { CompanyPage, CompanyQuery } from '../../src/web/api.ts';
+import type { Company, CompanyPage, CompanyQuery } from '../../src/web/api.ts';
+import type { ReactElement } from 'react';
 
 import { describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -7,18 +8,63 @@ import { pageFor } from '../../src/web/app.tsx';
 import {
   CompaniesPage,
   CompaniesView,
+  CompanyRow,
   COMPANIES_EMPTY_DESCRIPTION,
   COMPANIES_EMPTY_TITLE,
   COMPANIES_PAGE_SIZE,
   COMPANIES_TITLE,
   INITIAL_QUERY,
+  NO_EXCHANGE,
+  NOT_SYNCED,
   pageCountOf,
   SELECTED_ONLY_LABEL,
+  withCompany,
   withSearch,
   withSelectedOnly,
 } from '../../src/web/pages/companies.tsx';
 
 const EMPTY: CompanyPage = { items: [], page: 1, pageSize: COMPANIES_PAGE_SIZE, total: 0 };
+
+/** Apple as the server answers it after a sync, in the summary. */
+const APPLE: Company = {
+  cik: 320193,
+  cik10: '0000320193',
+  ticker: 'AAPL',
+  name: 'Apple Inc.',
+  selected: true,
+  exchanges: ['Nasdaq'],
+  sic: '3571',
+  sicDescription: 'Electronic Computers',
+  category: 'Large accelerated filer',
+  fiscalYearEnd: '0926',
+  filingsSyncedAt: '2026-11-10T08:30:00.000Z',
+};
+
+/** Microsoft as the server answers it before its first sync, out of the summary. */
+const MICROSOFT: Company = {
+  ...APPLE,
+  cik: 789019,
+  cik10: '0000789019',
+  ticker: 'MSFT',
+  name: 'Microsoft Corp',
+  selected: false,
+  exchanges: [],
+  filingsSyncedAt: null,
+};
+
+const TWO: CompanyPage = { ...EMPTY, items: [APPLE, MICROSOFT], total: 2 };
+
+/** A stand-in for the server that answers every list with `page` and every change as asked. */
+const stubApi = (page: CompanyPage) => ({
+  list: async (): Promise<CompanyPage> => page,
+  select: async (ticker: string, selected: boolean): Promise<Company> => ({ ...APPLE, ticker, selected }),
+});
+
+/** The props a `CompanyRow` hands its `RowStatCard`, read without a DOM by calling the row. */
+interface CardProps {
+  readonly subtitle: ReactElement<{ variant: string, onClick: () => void }>
+  readonly action: ReactElement<{ onChange: (next: boolean) => void }>
+}
 
 /** The attribute React writes for a disabled button; the class list also holds `disabled:` variants. */
 const DISABLED_ATTR = ' disabled=""';
@@ -78,9 +124,81 @@ describe('CompaniesView', () => {
   });
 });
 
+describe('CompanyRow', () => {
+  test('shows the ticker, the name as a button and the three ministats', () => {
+    const html = renderToStaticMarkup(<CompanyRow company={APPLE} />);
+    expect(html).toContain('AAPL');
+    expect(html).toMatch(/<button[^>]*>Apple Inc\.<\/button>/);
+    expect(html).toContain('320193');
+    expect(html).toContain('Nasdaq');
+    expect(html).toContain('2026-11-10');
+  });
+
+  test('the switch reads the company\'s selected flag', () => {
+    expect(renderToStaticMarkup(<CompanyRow company={APPLE} />)).toContain('role="switch" aria-checked="true"');
+    expect(renderToStaticMarkup(<CompanyRow company={MICROSOFT} />)).toContain('role="switch" aria-checked="false"');
+    expect(renderToStaticMarkup(<CompanyRow company={MICROSOFT} />)).toContain('aria-label="Show Microsoft Corp in the summary"');
+  });
+
+  test('an unsynced company shows no exchange and never', () => {
+    const html = renderToStaticMarkup(<CompanyRow company={MICROSOFT} />);
+    expect(html).toContain(NO_EXCHANGE);
+    expect(html).toContain(NOT_SYNCED);
+  });
+
+  test('the name is a ghost button that opens the filings by ticker', () => {
+    const opened: string[] = [];
+    const card = CompanyRow({ company: APPLE, onOpenFilings: (ticker) => opened.push(ticker) }) as ReactElement<CardProps>;
+    expect(card.props.subtitle.props.variant).toBe('ghost');
+    card.props.subtitle.props.onClick();
+    expect(opened).toEqual(['AAPL']);
+  });
+
+  test('the switch hands on its next state as an explicit boolean, with the ticker', () => {
+    const sent: Array<[string, boolean]> = [];
+    const card = CompanyRow({ company: APPLE, onSelectedChange: (ticker, next) => sent.push([ticker, next]) }) as ReactElement<CardProps>;
+    card.props.action.props.onChange(false);
+    card.props.action.props.onChange(true);
+    expect(sent).toEqual([['AAPL', false], ['AAPL', true]]);
+  });
+});
+
+describe('the rows', () => {
+  test('the view draws one row per company and no empty state', () => {
+    const html = renderToStaticMarkup(<CompaniesView result={TWO} />);
+    expect(html).toContain('Apple Inc.');
+    expect(html).toContain('Microsoft Corp');
+    expect(html.match(/role="switch"/g)).toHaveLength(2);
+    expect(html).not.toContain(COMPANIES_EMPTY_TITLE);
+  });
+
+  test('a failed change keeps the rows under the alert', () => {
+    const html = renderToStaticMarkup(<CompaniesView result={TWO} error="could not update AAPL" />);
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('Apple Inc.');
+  });
+
+  test('the server\'s answer replaces the company with its ticker, and nothing else', () => {
+    const next = withCompany(TWO, { ...MICROSOFT, selected: true });
+    expect(next.items.map((item) => item.selected)).toEqual([true, true]);
+    expect(next.items[0]).toBe(APPLE);
+    expect(TWO.items[1]?.selected).toBe(false);
+  });
+
+  test('an answer for a company the page no longer holds leaves the same page', () => {
+    expect(withCompany(TWO, { ...APPLE, ticker: 'NVDA' })).toBe(TWO);
+  });
+});
+
 describe('CompaniesPage', () => {
+  test('renders the rows of its first page', () => {
+    const html = renderToStaticMarkup(<CompaniesPage api={stubApi(TWO)} initial={TWO} />);
+    expect(html).toContain('Apple Inc.');
+    expect(html).toContain('2 companies');
+  });
+
   test('renders its first page with no server answer yet', () => {
-    const api = { list: async (): Promise<CompanyPage> => EMPTY };
+    const api = stubApi(EMPTY);
     const html = renderToStaticMarkup(<CompaniesPage api={api} initial={{ ...EMPTY, total: 1 }} />);
     expect(html).toContain('1 company');
     expect(html).toContain('Page 1 of 1');
