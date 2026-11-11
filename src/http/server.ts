@@ -181,7 +181,7 @@ export async function startService(opts: StartOptions = {}): Promise<ServiceHand
       }
       app.use('/auth', authRouter(db, auth));
       app.use('/api', requireApiAccess(db, apiKey));
-      mountRoutes(app, db);
+      mountRoutes(app, db, undefined, auth.mode);
       if (existsSync(webDist)) {
         app.use(express.static(webDist));
         // The app routes in the browser, so a reload on /tokens or the landing page gets the page and not a 404.

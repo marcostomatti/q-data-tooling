@@ -24,8 +24,10 @@ path below is a real file in the tree; the web app under `src/web/` is not cover
 - API docs: `route()` takes a description after the tool's schema, its `summary` and the
   contract's `output` schema, and `webRoute()` takes it after its schema. `buildOpenApiDocument`
   in `src/http/openapi.ts` reads `ROUTES` into the OpenAPI document served at
-  `GET /api/openapi.json` and `GET /api/docs`. `service_info` is described in
-  `src/routes/info/http.ts`. `docs/documentation.md` holds the rules.
+  `GET /api/openapi.json` and `GET /api/docs`, and `serviceDocument` in `src/routes/http.ts` adds
+  the template's fixed routes: `/health`, the docs and the `/auth` routes of `AUTH_MODE`.
+  `service_info` is described in `src/routes/info/http.ts`. `docs/documentation.md` holds the
+  rules and the table of every route the template serves.
 - TSDoc: every exported symbol gets a `/** ... */` block, with `@param`, `@returns` and `@throws`
   on a function. `bun run docs:generate` renders it with TypeDoc into `.docs/`.
 - Integration test: `tests/integration/auth-flow.test.ts` is the only integration test, because
