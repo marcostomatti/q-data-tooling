@@ -1,9 +1,12 @@
-import type { OpenApiDocument } from './openapi.ts';
+import type { DocumentedOperation, OpenApiDocument } from './openapi.ts';
 
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { Router } from 'express';
+import { z } from 'zod';
+
+import { API_SECURITY, failureResponse } from './openapi.ts';
 
 /**
  * The folder of the installed `swagger-ui-dist`, resolved from its `package.json` so the files
@@ -77,4 +80,39 @@ export function docsRouter(document: OpenApiDocument, prefix: string): Router {
     });
   }
   return router;
+}
+
+/**
+ * The two routes {@link docsRouter} serves that a reader calls, as document operations: the
+ * document itself and the page. The page's own files are left out, since only the page loads them.
+ *
+ * @param prefix - Where the router is mounted, `/api` for the served document.
+ * @returns The two operations, with their full paths.
+ */
+export function docsOperations(prefix: string): readonly DocumentedOperation[] {
+  const unauthorized = failureResponse('No credential, or a wrong one, was sent.');
+  return [
+    {
+      method: 'get',
+      path: `${prefix}/openapi.json`,
+      summary: 'This OpenAPI document, as JSON.',
+      tags: ['docs'],
+      security: API_SECURITY,
+      responses: {
+        200: { description: 'The document.', content: { 'application/json': { schema: z.looseObject({ openapi: z.string() }) } } },
+        401: unauthorized,
+      },
+    },
+    {
+      method: 'get',
+      path: `${prefix}/docs`,
+      summary: 'A Swagger UI page that reads this document.',
+      tags: ['docs'],
+      security: API_SECURITY,
+      responses: {
+        200: { description: 'The page.', content: { 'text/html': { schema: z.string() } } },
+        401: unauthorized,
+      },
+    },
+  ];
 }

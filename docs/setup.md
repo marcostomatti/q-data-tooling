@@ -78,8 +78,8 @@ curl -s localhost:3000/health
 curl -s -H "Authorization: Bearer <the key>" localhost:3000/api/info
 ```
 
-`/health` answers `ok`. `/api/info` answers the reference route's JSON, and `/api` answers 401
-to any request without a good credential.
+`/health` answers `{"status":"ok"}`. `/api/info` answers the reference route's JSON, and `/api`
+answers 401 to any request without a good credential.
 
 ## The HTTP service
 
