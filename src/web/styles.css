@@ -1,6 +1,51 @@
 @import "tailwindcss";
 @import "@open-tomato/components/styles.css";
 
+/* `@open-tomato/charts` ships classes in its compiled JS, as the components library does, so
+   Tailwind scans it for the chart root's and tooltip's utilities. */
+@source "../../node_modules/@open-tomato/charts/dist";
+
+/* The theme tokens `@open-tomato/charts` reads, which the consuming app defines. Each one points
+   at a semantic variable of the components library, so the chart flips with `data-theme` as the
+   library does. `--color-warning` is the library's own token and is not redefined. `static` keeps
+   every token in the build: the chart reads them from the computed style, not through a class. */
+@theme static {
+  --color-series-1: var(--primary);
+  --color-series-2: var(--accent);
+  --color-series-3: var(--warning);
+  --color-series-4: var(--info);
+  --color-series-5: var(--leaf);
+  --color-series-6: var(--danger);
+  --color-series-7: var(--fg3);
+  --color-series-8: var(--border-focus);
+  --color-good: var(--success);
+  --color-serious: var(--danger);
+  --color-critical: var(--primary-press);
+  --color-surface: var(--surface-1);
+  --color-plane: var(--bg);
+  --color-ink: var(--fg1);
+  --color-ink-2: var(--fg2);
+  --color-muted: var(--fg3);
+  --color-grid: var(--border-soft);
+  --color-baseline: var(--border-strong);
+  --color-ring: var(--border-focus);
+  --color-seq-100: var(--green-100);
+  --color-seq-200: var(--green-200);
+  --color-seq-300: var(--green-300);
+  --color-seq-400: var(--green-400);
+  --color-seq-500: var(--green-500);
+  --color-seq-600: var(--green-600);
+  --color-seq-700: var(--green-700);
+  --color-diverge-mid: var(--surface-sunk);
+  --color-pole-ship: var(--success);
+  --color-pole-ship-core: var(--green-100);
+  --color-pole-fail: var(--danger);
+  --color-pole-fail-core: var(--red-100);
+  --color-pole-base: var(--fg3);
+  --color-pole-base-core: var(--surface-sunk);
+  --color-delta-up: var(--success);
+}
+
 /* The library's AppShell fills the box its parent gives it and scrolls only its content slot,
    so the page's root boxes take the whole viewport. Without this the shell is as tall as its
    content, and the rail stops where the nav ends. */

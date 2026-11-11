@@ -63,10 +63,18 @@ Read a story first. Pass variants and flags only, never a class string.
 ```css
 @import "tailwindcss";
 @import "@open-tomato/components/styles.css";
+@source "../../node_modules/@open-tomato/charts/dist";
 ```
 
-The library's `@source` points Tailwind's scan at the library. Write no
-hand-made CSS here; change the page's composition first.
+The components library's `@source` points Tailwind's scan at that library, and
+the line after it points the scan at `@open-tomato/charts`, which brings no
+`@source` of its own. Below them a `@theme static` block defines every token
+the charts read (`--color-series-1` and the rest), each one a `var()` over a
+semantic variable of the components library, so a chart flips with
+`data-theme` as the library does; `static` keeps a token in the build when no
+class uses it, since the chart reads it from the computed style. Last, a rule
+gives `html`, `body` and `#root` the full height the `AppShell` fills. Write no
+other hand-made CSS here; change the page's composition first.
 
 ## The library version
 

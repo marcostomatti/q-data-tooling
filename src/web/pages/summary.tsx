@@ -1,6 +1,9 @@
+import type { TrackedForm } from '../../entities/filing.ts';
+import type { BarSeries, ChartTone } from '@open-tomato/charts';
 import type { Column } from '@open-tomato/components';
 
-import { Badge, Banner, Button, ConfirmPopover, Content, EmptyState, SmallStatCard, Table } from '@open-tomato/components';
+import { echartsEngine } from '@open-tomato/charts';
+import { Badge, Banner, Button, ConfirmPopover, Content, EmptyState, SectionCard, SmallStatCard, Table } from '@open-tomato/components';
 import { useEffect, useState } from 'react';
 
 import { companies, summary, type Company, type CompanySummary, type SummaryPage } from '../api.ts';
@@ -205,6 +208,71 @@ export function SummaryTable({ companies: rows, onOpenFilings, onRemove }: Summa
   return <Table columns={summaryColumns({ onOpenFilings, onRemove })} data={rows} getRowId={(company) => company.ticker} />;
 }
 
+/** The title of the card holding the chart of filings per company. */
+export const FILINGS_CHART_TITLE = 'Filings per company';
+
+/** What the chart of filings per company reads to assistive tech. */
+export const FILINGS_CHART_LABEL = 'Filings per company in the last year, stacked by form';
+
+/** The colour of each tracked form's stack, a series tone the app's stylesheet defines. */
+export const FORM_TONES: Readonly<Record<TrackedForm, ChartTone>> = {
+  '10-K': 'series-1',
+  '10-Q': 'series-2',
+  '8-K': 'series-3',
+};
+
+/** The chart's input: one category per company and one series per tracked form. */
+export interface FilingsChartData {
+  /** The companies' tickers, in the order the summary lists them. */
+  readonly categories: readonly string[]
+  /** One series per entry of `TRACKED_FORMS`, in its order, each one count per company. */
+  readonly series: readonly BarSeries[]
+}
+
+/**
+ * The stacked bar chart's data over the companies of the summary: a company per category, keyed
+ * by ticker, and a series per tracked form, so each bar stacks the company's counts by form.
+ *
+ * @param companies - The selected companies' summaries.
+ * @returns The categories and the series, for the library's `BarChart`.
+ */
+export function filingsChartData(companies: readonly CompanySummary[]): FilingsChartData {
+  return {
+    categories: companies.map((company) => company.ticker),
+    series: TRACKED_FORMS.map((form) => ({
+      id: form,
+      label: form,
+      tone: FORM_TONES[form],
+      values: companies.map((company) => company.counts[form]),
+    })),
+  };
+}
+
+const { BarChart } = echartsEngine;
+
+/** The props of {@link SummaryChart}. */
+export interface SummaryChartProps {
+  /** The selected companies' summaries, one bar each. */
+  readonly companies: readonly CompanySummary[]
+}
+
+/**
+ * The Summary page's chart: a `SectionCard` holding the `@open-tomato/charts` `BarChart` in
+ * `stacked` mode, one bar per selected company and one stack per tracked form. The chart takes
+ * the ECharts engine straight from `echartsEngine`, so no `ChartEngineProvider` wraps the app.
+ *
+ * @param props - The companies, as {@link SummaryChartProps} lists them.
+ * @returns The chart card.
+ */
+export function SummaryChart({ companies: rows }: SummaryChartProps) {
+  const { categories, series } = filingsChartData(rows);
+  return (
+    <SectionCard title={FILINGS_CHART_TITLE}>
+      <BarChart ariaLabel={FILINGS_CHART_LABEL} categories={categories} series={series} mode="stacked" />
+    </SectionCard>
+  );
+}
+
 /**
  * The summary with one company taken out, matched by ticker, and its total one less. A ticker
  * the summary does not hold leaves the same object, so React skips the render.
@@ -231,8 +299,8 @@ export interface SummaryViewProps extends SummaryRowHandlers {
 /**
  * The Summary page as a pure view: a page header titled {@link SUMMARY_TITLE}, the stat cards
  * once a summary is held, a `Banner` with a failed fetch's or removal's message, the
- * {@link SummaryTable} while the summary lists a company, and the library's `EmptyState` while it
- * lists none. The library has no page-header component, so the header is an `h1` in a `Content`
+ * {@link SummaryTable} and the {@link SummaryChart} below it while the summary lists a company,
+ * and the library's `EmptyState` while it lists none. The library has no page-header component, so the header is an `h1` in a `Content`
  * row. Pure: it holds no state and calls no API.
  *
  * @param props - The summary, the failure and the row handlers, as {@link SummaryViewProps} lists them.
@@ -252,6 +320,7 @@ export function SummaryView({ result, error, onOpenFilings, onRemove }: SummaryV
       )}
       {result !== undefined && <SummaryStatCards stats={summaryStats(items)} />}
       {items.length > 0 && <SummaryTable companies={items} onOpenFilings={onOpenFilings} onRemove={onRemove} />}
+      {items.length > 0 && <SummaryChart companies={items} />}
       {items.length === 0 && <EmptyState title={SUMMARY_EMPTY_TITLE} description={SUMMARY_EMPTY_DESCRIPTION} />}
     </Content>
   );

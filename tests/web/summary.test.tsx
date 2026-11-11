@@ -1,7 +1,10 @@
 import type { CompanySummary, SummaryPage } from '../../src/web/api.ts';
+import type { TokenName } from '@open-tomato/charts';
 import type { ReactElement } from 'react';
 
-import { Badge, Button, ConfirmPopover } from '@open-tomato/components';
+import { echartsEngine, THEME_TOKENS, tokenName } from '@open-tomato/charts';
+import { buildBarChartOption, tokensFrom } from '@open-tomato/charts/engine';
+import { Badge, Button, ConfirmPopover, SectionCard } from '@open-tomato/components';
 import { describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 
@@ -10,6 +13,10 @@ import { pageFor } from '../../src/web/app.tsx';
 import { TRACKED_FORMS } from '../../src/web/components/filings-view.tsx';
 import {
   AVERAGE_FILINGS_TITLE,
+  FILINGS_CHART_LABEL,
+  FILINGS_CHART_TITLE,
+  filingsChartData,
+  FORM_TONES,
   LATEST_FILING_TITLE,
   NO_LATEST_FILING,
   REMOVE_CONFIRM_LABEL,
@@ -19,6 +26,7 @@ import {
   SUMMARY_EMPTY_TITLE,
   SUMMARY_PAGE_SIZE,
   SUMMARY_TITLE,
+  SummaryChart,
   summaryColumns,
   SummaryStatCards,
   summaryStats,
@@ -212,5 +220,52 @@ describe('withoutCompany', () => {
   test('a ticker the summary does not hold leaves the same object', () => {
     const page = pageOf([APPLE]);
     expect(withoutCompany(page, 'MSFT')).toBe(page);
+  });
+});
+
+describe('the summary chart', () => {
+  test('has one category per company and one series per tracked form, counted per company', () => {
+    const { categories, series } = filingsChartData([APPLE, MICROSOFT]);
+    expect(categories).toEqual(['AAPL', 'MSFT']);
+    expect(series.map((entry) => entry.id)).toEqual([...TRACKED_FORMS]);
+    expect(series.map((entry) => entry.tone)).toEqual(TRACKED_FORMS.map((form) => FORM_TONES[form]));
+    expect(series.map((entry) => entry.values)).toEqual([[1, 1], [3, 3], [8, 11]]);
+  });
+
+  test('gives each form its own tone', () => {
+    expect(new Set(Object.values(FORM_TONES)).size).toBe(TRACKED_FORMS.length);
+  });
+
+  test('draws the stacked BarChart inside a SectionCard', () => {
+    const card = SummaryChart({ companies: [APPLE] }) as ReactElement<{ title: string, children: ReactElement<Record<string, unknown>> }>;
+    expect(card.type).toBe(SectionCard);
+    expect(card.props.title).toBe(FILINGS_CHART_TITLE);
+    const chart = card.props.children;
+    expect(chart.type).toBe(echartsEngine.BarChart);
+    expect(chart.props.mode).toBe('stacked');
+    expect(chart.props.ariaLabel).toBe(FILINGS_CHART_LABEL);
+  });
+
+  test('stacks every form on one stack in the option the engine draws, and grouped mode does not', () => {
+    const data = filingsChartData([APPLE, MICROSOFT]);
+    const values = Object.fromEntries(THEME_TOKENS.map((token) => [tokenName(token), '#000000'])) as Record<TokenName, string>;
+    const tokens = tokensFrom(values);
+    const stacksOf = (mode: 'grouped' | 'stacked'): unknown[] => {
+      const option = buildBarChartOption({ ariaLabel: FILINGS_CHART_LABEL, ...data, mode }, tokens) as { series: { stack?: unknown }[] };
+      return option.series.map((entry) => entry.stack);
+    };
+    const stacked = stacksOf('stacked');
+    expect(stacked).toHaveLength(TRACKED_FORMS.length);
+    expect(stacked[0]).toBeDefined();
+    expect(new Set(stacked).size).toBe(1);
+    expect(stacksOf('grouped').every((stack) => stack === undefined)).toBe(true);
+  });
+
+  test('the view holds the chart while the summary lists a company, and not otherwise', () => {
+    const held = renderToStaticMarkup(<SummaryView result={pageOf([APPLE])} />);
+    expect(held).toContain(FILINGS_CHART_TITLE);
+    expect(held).toContain(`aria-label="${FILINGS_CHART_LABEL}"`);
+    const empty = renderToStaticMarkup(<SummaryView result={pageOf([])} />);
+    expect(empty).not.toContain(FILINGS_CHART_TITLE);
   });
 });
