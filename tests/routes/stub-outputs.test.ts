@@ -1,8 +1,10 @@
+import type { SqliteTestClient } from '../support/sqlite-db.ts';
+
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 
 import { CompanyListInput, CompanyListOutput, CompanyUpdateOutput } from '../../src/routes/companies/contract.ts';
 import { listCompanies } from '../../src/routes/companies/list.flow.ts';
-import { companyStubStore } from '../../src/routes/companies/stub.ts';
+import { companyStore } from '../../src/routes/companies/repository.ts';
 import { companyTools } from '../../src/routes/companies/tool.ts';
 import { updateCompany } from '../../src/routes/companies/update.flow.ts';
 import { FilingListInput, FilingListOutput, SummaryInput, SummaryOutput } from '../../src/routes/filings/contract.ts';
@@ -13,23 +15,29 @@ import { filingTools } from '../../src/routes/filings/tool.ts';
 import { mountRoutes } from '../../src/routes/http.ts';
 import { startTestServer, type TestServer } from '../http/harness.ts';
 import { captureLog } from '../support/capture-log.ts';
-import { connectTools, untouchableDb } from '../support/tool-harness.ts';
+import { connectTools } from '../support/tool-harness.ts';
+
+import { openSeededCompaniesDb } from './companies/seeded-db.ts';
 
 const { log } = captureLog();
 
+/** The seeded companies the companies routes and tools read; the filings stubs read no table. */
+let db: SqliteTestClient;
 let server: TestServer;
 
 beforeAll(async () => {
-  server = await startTestServer((app) => mountRoutes(app, untouchableDb(), log));
+  db = await openSeededCompaniesDb();
+  server = await startTestServer((app) => mountRoutes(app, db, log));
 });
 
 afterAll(async () => {
   await server.close();
+  db.$client.close();
 });
 
 /** Calls a tool and answers its body once it did not fail. */
 async function toolBody(tools: typeof companyTools, name: string, args: Record<string, unknown>): Promise<unknown> {
-  const connected = await connectTools(tools, untouchableDb());
+  const connected = await connectTools(tools, db);
   const outcome = await connected.call(name, args);
   expect(outcome.failed).toBe(false);
   return outcome.body;
@@ -45,7 +53,7 @@ async function routeData(method: 'GET' | 'PATCH', path: string, body?: unknown):
 
 describe('the output schemas refuse what the stubs must not answer (control)', () => {
   test('a stray field, a missing page and a bad CIK padding are each refused', async () => {
-    const page = await listCompanies(CompanyListInput.parse({}), { store: companyStubStore, log });
+    const page = await listCompanies(CompanyListInput.parse({}), { store: companyStore(db), log });
     expect(CompanyListOutput.safeParse(page).success).toBe(true);
     expect(CompanyListOutput.safeParse({ ...page, extra: 1 }).success).toBe(false);
     expect(CompanyListOutput.safeParse({ items: page.items }).success).toBe(false);
@@ -56,7 +64,7 @@ describe('the output schemas refuse what the stubs must not answer (control)', (
 
 describe('company_list', () => {
   test('the flow, the tool and the route answer a page that passes CompanyListOutput', async () => {
-    const fromFlow = await listCompanies(CompanyListInput.parse({}), { store: companyStubStore, log });
+    const fromFlow = await listCompanies(CompanyListInput.parse({}), { store: companyStore(db), log });
     const fromTool = await toolBody(companyTools, 'company_list', {});
     const fromRoute = await routeData('GET', '/api/companies');
     for (const answer of [fromFlow, fromTool, fromRoute]) {
@@ -65,7 +73,7 @@ describe('company_list', () => {
   });
 
   test('an empty page passes too', async () => {
-    const answer = await listCompanies(CompanyListInput.parse({ q: 'zzzz-no-match' }), { store: companyStubStore, log });
+    const answer = await listCompanies(CompanyListInput.parse({ q: 'zzzz-no-match' }), { store: companyStore(db), log });
     expect(answer.items).toEqual([]);
     expect(CompanyListOutput.safeParse(answer).success).toBe(true);
   });
@@ -73,9 +81,9 @@ describe('company_list', () => {
 
 describe('company_update', () => {
   test('the flow, the tool and the route answer a company that passes CompanyUpdateOutput', async () => {
-    const fromFlow = await updateCompany({ ticker: 'AAPL', selected: false }, { store: companyStubStore, log });
-    const fromTool = await toolBody(companyTools, 'company_update', { ticker: 'msft', selected: true });
-    const fromRoute = await routeData('PATCH', '/api/companies/msft', { selected: true });
+    const fromFlow = await updateCompany({ ticker: 'AAPL', selected: false }, { store: companyStore(db), log });
+    const fromTool = await toolBody(companyTools, 'company_update', { ticker: 'wmt', selected: true });
+    const fromRoute = await routeData('PATCH', '/api/companies/wmt', { selected: true });
     expect(CompanyUpdateOutput.parse(fromFlow).selected).toBe(false);
     expect(CompanyUpdateOutput.parse(fromTool).selected).toBe(true);
     expect(CompanyUpdateOutput.parse(fromRoute).selected).toBe(true);

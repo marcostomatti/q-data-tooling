@@ -1,27 +1,36 @@
+import type { SqliteTestClient } from '../../support/sqlite-db.ts';
+
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 
 import { DOMAIN } from '../../../src/routes/companies/contract.ts';
 import { companyListRoute, companyRoutes, companyUpdateRoute } from '../../../src/routes/companies/http.ts';
-import { STUB_COMPANIES } from '../../../src/routes/companies/stub.ts';
 import { companyListTool, companyUpdateTool } from '../../../src/routes/companies/tool.ts';
 import { mountRoutes, ROUTES } from '../../../src/routes/http.ts';
 import { startTestServer, type TestServer } from '../../http/harness.ts';
 import { captureLog } from '../../support/capture-log.ts';
-import { untouchableDb } from '../../support/tool-harness.ts';
+
+import { openSeededCompaniesDb, SEEDED_TICKERS_BY_NAME, selectOnlyWithSql, storedSelected } from './seeded-db.ts';
 
 /** The base log the routes are mounted with; each request's flow writes its line here. */
 const { log, records } = captureLog();
 
+let db: SqliteTestClient;
 let server: TestServer;
 
 beforeAll(async () => {
-  // The stub flows read no table, so a database that fails when touched proves it.
-  server = await startTestServer((app) => mountRoutes(app, untouchableDb(), log));
+  db = await openSeededCompaniesDb();
+  server = await startTestServer((app) => mountRoutes(app, db, log));
 });
 
 afterAll(async () => {
   await server.close();
+  db.$client.close();
 });
+
+/** The tickers of the companies a list answer holds, in its order. */
+function tickersOf(body: unknown): string[] {
+  return (body as { data: { items: { ticker: string }[] } }).data.items.map((company) => company.ticker);
+}
 
 describe('the companies routes in the table', () => {
   test('are listed in ROUTES on their tools\' own schema objects', () => {
@@ -38,15 +47,30 @@ describe('the companies routes in the table', () => {
 });
 
 describe('GET /api/companies', () => {
-  test('answers the first page of the stub companies in the success envelope', async () => {
+  test('answers the first page of the stored companies by name in the success envelope', async () => {
     const outcome = await server.request('GET', '/api/companies');
     expect(outcome.status).toBe(200);
-    expect(outcome.body).toEqual({ success: true, data: { items: [...STUB_COMPANIES], page: 1, pageSize: 25, total: STUB_COMPANIES.length } });
+    expect(outcome.body).toMatchObject({ success: true, data: { page: 1, pageSize: 25, total: SEEDED_TICKERS_BY_NAME.length } });
+    expect(tickersOf(outcome.body)).toEqual(SEEDED_TICKERS_BY_NAME);
+  });
+
+  test('reads q, page and pageSize from the query string and pages on the server', async () => {
+    const matched = await server.request('GET', '/api/companies?q=aemr');
+    expect(tickersOf(matched.body)).toEqual(['AEM']);
+    const second = await server.request('GET', '/api/companies?page=2&pageSize=3');
+    expect(second.body).toMatchObject({ data: { page: 2, pageSize: 3, total: SEEDED_TICKERS_BY_NAME.length } });
+    expect(tickersOf(second.body)).toEqual(SEEDED_TICKERS_BY_NAME.slice(3));
   });
 
   test('reads selected from the query string as a boolean', async () => {
-    const outcome = await server.request('GET', '/api/companies?selected=false');
-    expect(outcome.body).toMatchObject({ success: true, data: { items: STUB_COMPANIES.filter((company) => !company.selected) } });
+    selectOnlyWithSql(db, [320193]);
+
+    const selected = await server.request('GET', '/api/companies?selected=true');
+    const unselected = await server.request('GET', '/api/companies?selected=false');
+
+    expect(tickersOf(selected.body)).toEqual(['AAPL']);
+    expect(tickersOf(unselected.body)).toEqual(SEEDED_TICKERS_BY_NAME.filter((ticker) => ticker !== 'AAPL'));
+    selectOnlyWithSql(db, []);
   });
 
   test('refuses a bad field with a 400 led by its path', async () => {
@@ -73,10 +97,17 @@ describe('GET /api/companies', () => {
 });
 
 describe('PATCH /api/companies/:ticker', () => {
-  test('answers the company with the flag set, reading a lower-case ticker as upper case', async () => {
-    const outcome = await server.request('PATCH', '/api/companies/msft', { selected: true });
+  test('stores the flag and answers the company, reading a lower-case ticker as upper case', async () => {
+    const outcome = await server.request('PATCH', '/api/companies/wmt', { selected: true });
     expect(outcome.status).toBe(200);
-    expect(outcome.body).toEqual({ success: true, data: { ...STUB_COMPANIES.find((company) => company.ticker === 'MSFT'), selected: true } });
+    expect(outcome.body).toMatchObject({ success: true, data: { cik: 104169, ticker: 'WMT', name: 'Walmart Inc.', selected: true } });
+    expect(storedSelected(db, 104169)).toBe(true);
+  });
+
+  test('a secondary ticker sets the flag on its company', async () => {
+    const outcome = await server.request('PATCH', '/api/companies/AEMRF', { selected: true });
+    expect(outcome.body).toMatchObject({ success: true, data: { cik: 2809, ticker: 'AEM', selected: true } });
+    expect(storedSelected(db, 2809)).toBe(true);
   });
 
   test('answers a 404 NotFoundError for a ticker no company trades under', async () => {

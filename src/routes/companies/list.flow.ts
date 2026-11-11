@@ -29,7 +29,8 @@ export interface CompanyListSlice {
 
 /**
  * What `listCompanies` reads: a store with the one method it calls, and the log its transport
- * has bound to the `Companies` domain. This stage passes the fixed stub store from `stub.ts`.
+ * has bound to the `Companies` domain. The route and the tool pass `companyStore(db)` from
+ * `repository.ts`.
  */
 export interface ListCompaniesDeps {
   /** The companies store. */

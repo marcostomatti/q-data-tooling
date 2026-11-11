@@ -3,7 +3,7 @@ import { defineTool, type ToolDefinition } from '../../mcp/register.ts';
 
 import { CompanyListInput, CompanyUpdateInput, DOMAIN } from './contract.ts';
 import { listCompanies } from './list.flow.ts';
-import { companyStubStore } from './stub.ts';
+import { companyStore } from './repository.ts';
 import { updateCompany } from './update.flow.ts';
 
 /**
@@ -20,7 +20,7 @@ export const companyListTool: ToolDefinition = defineTool({
     'or out of the summary, and `page` and `pageSize` choose the page.',
   input: CompanyListInput,
   annotations: { readOnlyHint: true, openWorldHint: false },
-  run: async (input, { log }) => listCompanies(input, { store: companyStubStore, log: inDomain(log, DOMAIN) }),
+  run: async (input, { db, log }) => listCompanies(input, { store: companyStore(db), log: inDomain(log, DOMAIN) }),
 });
 
 /**
@@ -37,7 +37,7 @@ export const companyUpdateTool: ToolDefinition = defineTool({
     'call changes nothing. Fails when no company trades under the ticker.',
   input: CompanyUpdateInput,
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  run: async (input, { log }) => updateCompany(input, { store: companyStubStore, log: inDomain(log, DOMAIN) }),
+  run: async (input, { db, log }) => updateCompany(input, { store: companyStore(db), log: inDomain(log, DOMAIN) }),
 });
 
 /** The companies tools, in the order of their routes in `companyRoutes`. */

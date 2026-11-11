@@ -8,7 +8,8 @@ import { scoped } from '../../logging.ts';
 /**
  * What `updateCompany` reads: a store with the one method it calls, and the log its transport
  * has bound to the `Companies` domain. `setSelected` answers the changed company, or `undefined`
- * when no company trades under the ticker. This stage passes the fixed stub store from `stub.ts`.
+ * when no company trades under the ticker. The route and the tool pass `companyStore(db)` from
+ * `repository.ts`.
  */
 export interface UpdateCompanyDeps {
   /** The companies store. */

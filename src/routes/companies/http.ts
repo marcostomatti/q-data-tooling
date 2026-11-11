@@ -5,7 +5,7 @@ import { inDomain } from '../../logging.ts';
 
 import { CompanyListInput, CompanyListOutput, CompanyUpdateInput, CompanyUpdateOutput, DOMAIN } from './contract.ts';
 import { listCompanies } from './list.flow.ts';
-import { companyStubStore } from './stub.ts';
+import { companyStore } from './repository.ts';
 import { updateCompany } from './update.flow.ts';
 
 /**
@@ -16,7 +16,7 @@ import { updateCompany } from './update.flow.ts';
 export const companyListRoute = route('get', '/companies', 'company_list', CompanyListInput, {
   summary: 'Lists one page of companies, matched by ticker prefix or name with q and filtered by selected.',
   output: CompanyListOutput,
-}, async (input, { log }) => listCompanies(input, { store: companyStubStore, log: inDomain(log, DOMAIN) }));
+}, async (input, { db, log }) => listCompanies(input, { store: companyStore(db), log: inDomain(log, DOMAIN) }));
 
 /**
  * `PATCH /api/companies/:ticker`, the HTTP twin of the `company_update` tool: the ticker from the
@@ -27,7 +27,7 @@ export const companyListRoute = route('get', '/companies', 'company_list', Compa
 export const companyUpdateRoute = route('patch', '/companies/:ticker', 'company_update', CompanyUpdateInput, {
   summary: 'Sets whether the company with the ticker is in the summary, from the required selected flag.',
   output: CompanyUpdateOutput,
-}, async (input, { log }) => updateCompany(input, { store: companyStubStore, log: inDomain(log, DOMAIN) }));
+}, async (input, { db, log }) => updateCompany(input, { store: companyStore(db), log: inDomain(log, DOMAIN) }));
 
 /** The companies routes, in the order `ROUTES` lists them. */
 export const companyRoutes: readonly RouteSpec[] = [companyListRoute, companyUpdateRoute];
