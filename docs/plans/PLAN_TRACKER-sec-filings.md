@@ -213,7 +213,7 @@ page's own `tests/web/companies.test.tsx`; no visual or screenshot tests. The na
     The rows task renders `result.items`; the view shows only the toolbar, an error alert and the
     empty state today. The debounce timer itself has no test: `renderToStaticMarkup` runs no
     effects and the repo has no DOM test environment.
-- [ ] Add the Companies page rows, one `RowStatCard` per company on the stats-only story with the name as a `ghost` `Button` calling `onOpenFilings` and a `Switch` sending `PATCH selected` with an explicit boolean, falling back to `DecoratedToggle`, then `OptionCard`, then a `Table` with a toggle column  {agent=loop-implementer effort=high}
+- [x] Add the Companies page rows, one `RowStatCard` per company on the stats-only story with the name as a `ghost` `Button` calling `onOpenFilings` and a `Switch` sending `PATCH selected` with an explicit boolean, falling back to `DecoratedToggle`, then `OptionCard`, then a `Table` with a toggle column  {agent=loop-implementer effort=high}
   - Close-out: `CompanyRow` in `src/web/pages/companies.tsx` is a `RowStatCard` (stats-only
     story): ticker as `title`, the name as a `ghost` `Button` in `subtitle` calling
     `onOpenFilings(ticker)`, ministats `cik`, `exchange` and `synced`, and a `Switch` in `action`
@@ -225,6 +225,7 @@ page's own `tests/web/companies.test.tsx`; no visual or screenshot tests. The na
     `{ selected }`; `withCompany` puts the server's answer into the page. `CompaniesPage` takes
     `onOpenFilings` for the Filings view stage to wire; `PAGES` does not pass it yet.
 - [ ] Add render tests showing an API error on the Companies page shows a message rather than an empty list, rows render from the API stub, and the switch sends the `PATCH` with an explicit boolean  {agent=tdd-guide effort=medium tests=module}
+  note: render tests are in tests/web/companies.test.tsx; effects need a DOM, so a small hook-dispatcher probe (`settle`) drives CompaniesPage against a recording fetch stub.
 - [ ] Run the Companies page gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}
 
 # Stage: Filings view

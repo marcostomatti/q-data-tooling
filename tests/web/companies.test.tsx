@@ -2,8 +2,10 @@ import type { Company, CompanyPage, CompanyQuery } from '../../src/web/api.ts';
 import type { ReactElement } from 'react';
 
 import { describe, expect, test } from 'bun:test';
+import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
+import { ApiError, createCompaniesClient } from '../../src/web/api.ts';
 import { pageFor } from '../../src/web/app.tsx';
 import {
   CompaniesPage,
@@ -225,5 +227,150 @@ describe('the toolbar query', () => {
     expect(pageCountOf(0, 25)).toBe(1);
     expect(pageCountOf(25, 25)).toBe(1);
     expect(pageCountOf(26, 25)).toBe(2);
+  });
+});
+
+/** React's private hook dispatcher slot; a probe stands in it because no DOM is available to run effects. */
+const INTERNALS = (React as unknown as Record<string, { H: unknown }>).__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE as { H: unknown };
+
+/** The most render passes a settle may take before a test calls it a loop. */
+const MAX_PASSES = 10;
+
+interface PendingEffect { readonly slot: number, readonly run: () => void | (() => void), readonly deps: readonly unknown[] | undefined }
+
+/** A driven component: its last tree, a `flush` that renders again until quiet, and a `stop` that runs the live cleanups. */
+interface Settled {
+  tree: ReactElement<Record<string, unknown>>
+  flush: () => Promise<void>
+  stop: () => void
+}
+
+/**
+ * Drives a component with `useState` and `useEffect` and no DOM: renders, runs the effects whose
+ * deps changed, lets the promises they started settle, and renders again until nothing changes.
+ *
+ * @param element - The element to drive; its type is called as a plain function.
+ * @returns The driven component, as {@link Settled} lists it.
+ */
+async function settle(element: ReactElement<Record<string, unknown>>): Promise<Settled> {
+  const state: unknown[] = [];
+  const lastDeps: Array<readonly unknown[] | undefined> = [];
+  const cleanups: Array<void | (() => void)> = [];
+  let pending: PendingEffect[] = [];
+  let dirty = false;
+  const settled: Settled = {
+    tree: element,
+    flush: async () => {
+      await flush();
+    },
+    stop: () => cleanups.forEach((cleanup) => typeof cleanup === 'function' && cleanup()),
+  };
+  async function flush(): Promise<void> {
+    for (let pass = 0; pass < MAX_PASSES; pass += 1) {
+      let stateSlot = 0;
+      let effectSlot = 0;
+      dirty = false;
+      const previous = INTERNALS.H;
+      INTERNALS.H = {
+        useState: (init: unknown) => {
+          const slot = stateSlot++;
+          if (!(slot in state)) state[slot] = typeof init === 'function'
+            ? (init as () => unknown)()
+            : init;
+          return [state[slot], (next: unknown) => {
+            const value = typeof next === 'function'
+              ? (next as (current: unknown) => unknown)(state[slot])
+              : next;
+            if (!Object.is(value, state[slot])) dirty = true;
+            state[slot] = value;
+          }];
+        },
+        useEffect: (run: () => void | (() => void), deps?: readonly unknown[]) => {
+          const slot = effectSlot++;
+          const before = lastDeps[slot];
+          const changed = deps === undefined || before === undefined || deps.some((dep, index) => !Object.is(dep, before[index]));
+          if (changed) pending.push({ slot, run, deps });
+        },
+      };
+      try {
+        settled.tree = (element.type as (props: unknown) => ReactElement<Record<string, unknown>>)(element.props);
+      } finally {
+        INTERNALS.H = previous;
+      }
+      for (const effect of pending) {
+        const cleanup = cleanups[effect.slot];
+        if (typeof cleanup === 'function') cleanup();
+        lastDeps[effect.slot] = effect.deps;
+        cleanups[effect.slot] = effect.run();
+      }
+      pending = [];
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (!dirty) break;
+    }
+  }
+  await flush();
+  return settled;
+}
+
+/** A `fetch` stand-in that records `METHOD path body` per call and answers each with `body` and `status`. */
+function recordingFetch(body: unknown, status = 200): { fetchImpl: typeof fetch, calls: string[] } {
+  const calls: string[] = [];
+  const fetchImpl = async (path: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    calls.push(`${init?.method} ${String(path)} ${String(init?.body ?? '')}`.trim());
+    return new Response(JSON.stringify(body), { status });
+  };
+  return { fetchImpl: fetchImpl as typeof fetch, calls };
+}
+
+describe('CompaniesPage against an API stub', () => {
+  test('an API error shows a message and not the empty list', async () => {
+    const { fetchImpl, calls } = recordingFetch({ success: false, error: { name: 'Boom', message: 'the registry is down' } }, 503);
+    const { tree, stop } = await settle(<CompaniesPage api={createCompaniesClient(fetchImpl)} />);
+    stop();
+    expect(calls).toEqual(['GET /api/companies?page=1&pageSize=25']);
+    const html = renderToStaticMarkup(tree);
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('the registry is down');
+    expect(html).not.toContain(COMPANIES_EMPTY_TITLE);
+  });
+
+  test('a failure that is not an Error still shows a message', async () => {
+    const api = { ...stubApi(EMPTY), list: () => Promise.reject(new ApiError(500, 'Error', 'the server answered 500')) };
+    const { tree, stop } = await settle(<CompaniesPage api={api} />);
+    stop();
+    expect(renderToStaticMarkup(tree)).toContain('the server answered 500');
+  });
+
+  test('rows render from the API stub', async () => {
+    const { fetchImpl, calls } = recordingFetch({ success: true, data: TWO });
+    const { tree, stop } = await settle(<CompaniesPage api={createCompaniesClient(fetchImpl)} />);
+    stop();
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls[0]).toBe('GET /api/companies?page=1&pageSize=25');
+    const html = renderToStaticMarkup(tree);
+    expect(html).toContain('Apple Inc.');
+    expect(html).toContain('Microsoft Corp');
+    expect(html.match(/role="switch"/g)).toHaveLength(2);
+    expect(html).not.toContain(COMPANIES_EMPTY_TITLE);
+  });
+
+  test('the switch sends the PATCH with an explicit boolean and the row takes the answer', async () => {
+    const answers = [{ success: true, data: TWO }, { success: true, data: { ...APPLE, selected: false } }];
+    const calls: string[] = [];
+    const fetchImpl = (async (path: string | URL | Request, init?: RequestInit) => {
+      calls.push(`${init?.method} ${String(path)} ${String(init?.body ?? '')}`.trim());
+      return new Response(JSON.stringify(answers[calls.length - 1]));
+    }) as typeof fetch;
+    const page = await settle(<CompaniesPage api={createCompaniesClient(fetchImpl)} />);
+    expect(calls.length).toBeGreaterThan(0);
+    expect(renderToStaticMarkup(page.tree)).toContain('role="switch" aria-checked="true"');
+
+    const onChange = page.tree.props.onSelectedChange as (ticker: string, selected: boolean) => void;
+    onChange('AAPL', false);
+    await page.flush();
+    page.stop();
+
+    expect(calls).toEqual(['GET /api/companies?page=1&pageSize=25', 'PATCH /api/companies/AAPL {"selected":false}']);
+    expect(renderToStaticMarkup(page.tree).match(/role="switch" aria-checked="false"/g)).toHaveLength(2);
   });
 });
