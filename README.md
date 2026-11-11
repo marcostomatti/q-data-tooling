@@ -69,6 +69,8 @@ The project's own pages:
 
 - [Spec](docs/specs/sec-filings.md): the stages of work, from endpoints to the summary page.
 - [setup-prompt.md](setup-prompt.md): the schemas, link templates and snippets the spec uses.
+- [PLAN-sec-filings.md](docs/plans/PLAN-sec-filings.md): the task checklist the work runs through,
+  stage by stage.
 
 The template's pages, each covering one part:
 
