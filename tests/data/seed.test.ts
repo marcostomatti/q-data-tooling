@@ -159,13 +159,9 @@ describe('bun run db:seed as a child process', () => {
     rmSync(workDir, { recursive: true, force: true });
   });
 
-  test('exits 0 and logs that no seeds ran when src/data/seeds/ does not exist', async () => {
-    // Arrange
-    expect(existsSync(SEEDS_FOLDER)).toBe(false);
-    const databaseFile = join(workDir, 'seed.sqlite');
-
-    // Act
-    const child = Bun.spawn(['bun', 'run', 'db:seed'], {
+  /** Runs `bun run <script>` from the repo root against `databaseFile`, and collects its output. */
+  async function runScript(script: string, databaseFile: string): Promise<{ output: string; exitCode: number }> {
+    const child = Bun.spawn(['bun', 'run', script], {
       cwd: repoRoot,
       env: { ...process.env, DATABASE_URL: `file:${databaseFile}` },
       stdout: 'pipe',
@@ -176,9 +172,22 @@ describe('bun run db:seed as a child process', () => {
       new Response(child.stderr).text(),
       child.exited,
     ]);
+    return { output: stdout + stderr, exitCode };
+  }
+
+  test('exits 0 and logs that it ran the seeds in src/data/seeds/ on a migrated database', async () => {
+    // Arrange
+    expect(listSeeds()).toEqual(['01-companies.ts']);
+    const databaseFile = join(workDir, 'seed.sqlite');
+    const migrated = await runScript('db:migrate', databaseFile);
+    expect(migrated.exitCode).toBe(0);
+
+    // Act
+    const seeded = await runScript('db:seed', databaseFile);
 
     // Assert
-    expect(exitCode).toBe(0);
-    expect(stdout + stderr).toContain('no seeds ran');
+    expect(seeded.exitCode).toBe(0);
+    expect(seeded.output).toContain('ran seeds');
+    expect(seeded.output).toContain('01-companies.ts');
   }, 30_000);
 });
