@@ -173,7 +173,7 @@ requests per second. `GET /filings/summary` never calls SEC.
 - [x] Add stub-`fetch` tests showing a 403 answers 502 when no rows are stored, and serves the stale rows with their `filingsSyncedAt` when some are  {agent=tdd-guide effort=medium tests=module}
 - [x] Add stub-`fetch` tests showing a second request within the TTL makes no SEC call, rows older than the 365-day cutoff are deleted on sync, and the request carries the `SEC_USER_AGENT` value  {agent=tdd-guide effort=medium tests=module}
   - Tests: `tests/routes/filings/sec-ttl-retention.test.ts`, 3 tests over the real SEC client and a stub `fetch` (TTL: one call across two requests; cutoff: a stored row 400 days old is gone after the sync; User-Agent: the `readSecUserAgent` value reaches the stub). The routes read the wall clock, so the filing dates are computed from it.
-- [ ] Run the SEC-fetching gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}
+- [x] Run the SEC-fetching gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}
   Close-out: lint, typecheck, typecheck:pg and privacy all exit 0 with no changes needed (privacy: 0 findings, no denylist).
 
 # Stage: Response and link validation
@@ -187,6 +187,7 @@ never as passed, when it is off.
 ```
 
 - [ ] Copy `.tmp/APPL-CIK0000320193.json` to `tests/fixtures/sec/aapl-submissions.json` and cut from it a 5-row fixture `tests/fixtures/sec/aapl-five-rows.json` holding one 10-K, 8-K, Form 4, 424B2 and UPLOAD row, reading no other file under `.tmp/`  {agent=loop-implementer effort=low}
+  - Note: five-row fixture keeps the full top-level object with `filings.recent` cut to source rows 6 (10-K 0000320193-26-000026), 1 (8-K), 4 (Form 4), 2 (424B2), 212 (UPLOAD), in that order; the full copy is byte-identical to the source.
 - [ ] Add unit tests over the 5-row fixture for every case in "Edge cases for test suite" that the parsers own, including column arrays of different lengths making the ingest throw  {agent=tdd-guide effort=high}
 - [ ] Add the contract test `tests/contract/aapl-submissions.test.ts` holding the 1001-row parse with 0 failures and the 94-row last-year cut with 13 tracked rows at `now = 2026-11-11`  {agent=tdd-guide effort=medium tests=module}
 - [ ] Add the live probe `tests/contract/sec-live.test.ts`, skipped unless `SEC_LIVE=1`, sending `HEAD` to the document, index and ix viewer links built for Apple's 10-K `0000320193-26-000026` and expecting 200 for each  {agent=tdd-guide effort=medium}

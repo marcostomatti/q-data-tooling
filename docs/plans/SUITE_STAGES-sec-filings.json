@@ -18,6 +18,12 @@
       "name": "Database and seed",
       "commit": "f67eb5d29073d146d92b46b195f5f9519f27097a",
       "via": "step"
+    },
+    {
+      "stage": 3,
+      "name": "SEC fetching",
+      "commit": "d2524b83c08248661cda58c5b5cd767bcfe22989",
+      "via": "step"
     }
   ]
 }
