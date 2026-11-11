@@ -1,7 +1,7 @@
 import type { TrackedForm } from '../../entities/filing.ts';
 import type { SelectionItem } from '@open-tomato/components';
 
-import { Accordion, AccordionItem, Banner, Button, Content, Drawer, EmptyState, EntityCard, Modal, Segmented } from '@open-tomato/components';
+import { Accordion, AccordionItem, Banner, Button, Content, Drawer, EmptyState, EntityCard, Grid, Modal, SectionCard, Segmented } from '@open-tomato/components';
 import { useEffect, useState } from 'react';
 
 import { filings, type Filing, type FilingPage } from '../api.ts';
@@ -272,6 +272,50 @@ export function FilingsAccordion({ filings: list, defaultOpen = TRACKED_FORMS.sl
   );
 }
 
+/**
+ * The subtitle of a form's card in the modal: how many filings the group holds.
+ *
+ * @param count - The number of filings of the form.
+ * @returns The line, such as `1 filing` or `4 filings`.
+ */
+export function filingCountOf(count: number): string {
+  return count === 1
+    ? '1 filing'
+    : `${count} filings`;
+}
+
+/** The props of {@link FilingsGrid}. */
+export interface FilingsGridProps {
+  /** The company's filings, newest first. */
+  readonly filings: readonly Filing[]
+}
+
+/**
+ * The modal's body (option A): the library's 3-column `Grid`, one `SectionCard` per tracked form
+ * titled with the form and its {@link filingCountOf} count, listing a {@link FilingRow} per filing
+ * with its links, or {@link noFilingsOf} when the form has none. Every group shows at once.
+ *
+ * @param props - The filings, as {@link FilingsGridProps} lists them.
+ * @returns The grid.
+ */
+export function FilingsGrid({ filings: list }: FilingsGridProps) {
+  return (
+    <Grid cols="3" gap="md">
+      {groupByForm(list).map(({ form, filings: group }) => (
+        <SectionCard key={form} title={form} subtitle={filingCountOf(group.length)}>
+          {group.length === 0
+            ? <p className="m-0 text-sm text-fg3">{noFilingsOf(form)}</p>
+            : (
+              <Content gap="sm">
+                {group.map((filing) => <FilingRow key={filing.accessionNumber} filing={filing} />)}
+              </Content>
+            )}
+        </SectionCard>
+      ))}
+    </Grid>
+  );
+}
+
 /** The props of {@link FilingsLayoutToggle}. */
 export interface FilingsLayoutToggleProps {
   /** The layout shown. */
@@ -316,8 +360,8 @@ export interface FilingsPanelProps extends FilingsLayoutToggleProps {
  * What the drawer and the modal both hold: the layout toggle in a header row, an alert when the
  * load failed, a loading line before the answer, the {@link LatestTenKCard} only when the company
  * filed a 10-K, and the library's `EmptyState` when it filed none of the tracked forms. In the
- * drawer layout the {@link FilingsAccordion} follows, once there are filings. Pure: it holds no
- * state and calls no API.
+ * drawer layout the {@link FilingsAccordion} follows, and in the modal layout the
+ * {@link FilingsGrid}, once there are filings. Pure: it holds no state and calls no API.
  *
  * @param props - The panel's values and handlers, as {@link FilingsPanelProps} lists them.
  * @returns The panel.
@@ -339,6 +383,9 @@ export function FilingsPanel({ layout, onLayoutChange, result, error, onOpenLink
       {result?.filings.length === 0 && <EmptyState title={FILINGS_EMPTY_TITLE} />}
       {layout === 'drawer' && result !== undefined && result.filings.length > 0 && (
         <FilingsAccordion filings={result.filings} />
+      )}
+      {layout === 'modal' && result !== undefined && result.filings.length > 0 && (
+        <FilingsGrid filings={result.filings} />
       )}
     </Content>
   );

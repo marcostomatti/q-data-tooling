@@ -15,8 +15,10 @@ import {
   FILINGS_LOADING,
   FILINGS_MAX_PAGES,
   FILINGS_PAGE_SIZE,
+  filingCountOf,
   FilingRow,
   FilingsAccordion,
+  FilingsGrid,
   FilingsLayoutToggle,
   FilingsPanel,
   FilingsView,
@@ -367,5 +369,46 @@ describe('FilingsAccordion', () => {
   test('the drawer panel shows no accordion before the answer or with no filings', () => {
     expect(renderToStaticMarkup(<FilingsPanel layout="drawer" />)).not.toContain('10-Q (');
     expect(renderToStaticMarkup(<FilingsPanel layout="drawer" result={{ company: COMPANY, filings: [] }} />)).not.toContain('10-Q (');
+  });
+});
+
+describe('FilingsGrid', () => {
+  test('is a 3-column grid with one SectionCard per tracked form, counted', () => {
+    const html = renderToStaticMarkup(<FilingsGrid filings={[EIGHT_K, TEN_Q, TEN_K, OLDER_TEN_K]} />);
+    expect(html).toContain('grid-cols-3');
+    expect(html.match(/<section/g)?.length).toBe(TRACKED_FORMS.length);
+    expect(html).toContain(filingCountOf(2));
+    expect(html.indexOf('>10-K<')).toBeLessThan(html.indexOf('>10-Q<'));
+    expect(html.indexOf('>10-Q<')).toBeLessThan(html.indexOf('>8-K<'));
+  });
+
+  test('every card lists its filings at once, with the document and ix viewer links', () => {
+    const html = renderToStaticMarkup(<FilingsGrid filings={WITH_TEN_K.filings} />);
+    for (const filing of WITH_TEN_K.filings) {
+      expect(html).toContain(`href="${filing.links.document}"`);
+      expect(html).toContain(`href="${(filing.links.inlineXbrlViewer ?? '').replaceAll('&', '&amp;')}"`);
+    }
+  });
+
+  test('a form not filed says so in its card', () => {
+    const html = renderToStaticMarkup(<FilingsGrid filings={WITHOUT_TEN_K.filings} />);
+    expect(html).toContain(noFilingsOf('10-K'));
+    expect(html).not.toContain(noFilingsOf('10-Q'));
+  });
+
+  test('the count reads singular for one filing and plural otherwise', () => {
+    expect(filingCountOf(0)).toBe('0 filings');
+    expect(filingCountOf(1)).toBe('1 filing');
+    expect(filingCountOf(4)).toBe('4 filings');
+  });
+
+  test('the modal panel holds the grid, the drawer panel does not', () => {
+    expect(renderToStaticMarkup(<FilingsPanel layout="modal" result={WITH_TEN_K} />)).toContain('grid-cols-3');
+    expect(renderToStaticMarkup(<FilingsPanel layout="drawer" result={WITH_TEN_K} />)).not.toContain('grid-cols-3');
+  });
+
+  test('the modal panel shows no grid before the answer or with no filings', () => {
+    expect(renderToStaticMarkup(<FilingsPanel layout="modal" />)).not.toContain('grid-cols-3');
+    expect(renderToStaticMarkup(<FilingsPanel layout="modal" result={{ company: COMPANY, filings: [] }} />)).not.toContain('grid-cols-3');
   });
 });
