@@ -102,8 +102,9 @@ export const filingStubStore = {
 
   /**
    * The summaries of the selected fixed companies, by name, in the window the query names. A
-   * `form` keeps only the companies with at least one filing of that base form, the reading the
-   * repository is to confirm.
+   * `form` keeps only the companies with at least one filing of that base form. The repository
+   * reads it the other way, `summarizeSelectedFilings` in `src/data/repositories/filings.ts`: it
+   * narrows the counts to the form and keeps every selected company.
    *
    * @param query - The form filter and the window.
    * @returns The summaries in the window and the count of every match.
