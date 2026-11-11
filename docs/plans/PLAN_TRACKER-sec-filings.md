@@ -247,7 +247,7 @@ cannot hold the links.
 - [x] Add the filings view modal body: a 3-column grid with one `SectionCard` per tracked form listing its filings and links  {agent=loop-implementer effort=medium}
   - Note: `FilingsGrid` (library `Grid cols="3"`, one `SectionCard` per `TRACKED_FORMS` entry, titled with the form, subtitle `filingCountOf`) renders in `FilingsPanel` for `layout === 'modal'` once there are filings, reusing `FilingRow`, so the links are the same `href`s as the drawer's.
   - Note: the cards keep the default padded body, not the full-bleed story's `padded={false}`: full-bleed rows would need a class string for their own padding, against the web README's variants-only rule. `Grid cols="3"` is fixed at three columns on every viewport.
-- [ ] Wire the Companies page `onOpenFilings` to open the filings view for the chosen ticker  {agent=loop-implementer effort=low}
+- [x] Wire the Companies page `onOpenFilings` to open the filings view for the chosen ticker  {agent=loop-implementer effort=low}
   note: `CompaniesPage` holds the open ticker and renders `FilingsDialog` beside `CompaniesView` (root is now a fragment); `onOpenFilings` stays as a notify callback and `filingsApi` injects the fake. Test in tests/web/companies.test.tsx.
 - [ ] Add render tests showing a company with no 10-K shows no latest card, the groups match the three forms, and the links carry the built sec.gov URLs  {agent=tdd-guide effort=medium tests=module}
 - [ ] Run the Filings view gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}

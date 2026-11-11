@@ -8,6 +8,7 @@ import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import { TrackedForm } from '../../src/entities/filing.ts';
+import { buildLinks } from '../../src/sec/parse.ts';
 import { createFilingsClient, filingsPath } from '../../src/web/api.ts';
 import {
   DEFAULT_LAYOUT,
@@ -410,5 +411,43 @@ describe('FilingsGrid', () => {
   test('the modal panel shows no grid before the answer or with no filings', () => {
     expect(renderToStaticMarkup(<FilingsPanel layout="modal" />)).not.toContain('grid-cols-3');
     expect(renderToStaticMarkup(<FilingsPanel layout="modal" result={{ company: COMPANY, filings: [] }} />)).not.toContain('grid-cols-3');
+  });
+});
+
+describe('the filings panel as a whole, in both layouts', () => {
+  const LAYOUTS = ['drawer', 'modal'] as const;
+  const BUILT = buildLinks(320193, TEN_K.accessionNumber, TEN_K.primaryDocument, true);
+  const BUILT_TEN_K: Filing = { ...TEN_K, links: BUILT };
+  const amp = (url: string) => url.replaceAll('&', '&amp;');
+
+  test.each(LAYOUTS)('%s: a company with no 10-K shows no latest card, yet all three groups', (layout) => {
+    const html = renderToStaticMarkup(<FilingsPanel layout={layout} result={WITHOUT_TEN_K} />);
+    expect(html).not.toContain('Latest:');
+    expect(html).toContain(noFilingsOf('10-K'));
+  });
+
+  test.each(LAYOUTS)('%s: the groups are the three tracked forms, in order', (layout) => {
+    const html = renderToStaticMarkup(<FilingsPanel layout={layout} result={WITH_TEN_K} />);
+    const at = TRACKED_FORMS.map((form) => html.indexOf(layout === 'drawer'
+      ? `${form} (`
+      : `>${form}<`));
+    expect(at.every((index) => index >= 0)).toBe(true);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+    expect(TRACKED_FORMS).toEqual(['10-K', '10-Q', '8-K']);
+  });
+
+  test.each(LAYOUTS)('%s: the links carry the sec.gov URLs ingest builds', (layout) => {
+    const html = renderToStaticMarkup(<FilingsPanel layout={layout} result={{ company: COMPANY, filings: [BUILT_TEN_K] }} />);
+    expect(BUILT.document.startsWith('https://www.sec.gov/Archives/edgar/data/320193/')).toBe(true);
+    expect(html).toContain(`href="${amp(BUILT.document)}"`);
+    expect(html).toContain(`href="${amp(BUILT.inlineXbrlViewer ?? '')}"`);
+    expect(BUILT.inlineXbrlViewer?.startsWith('https://www.sec.gov/ix?doc=')).toBe(true);
+  });
+
+  test('the latest card opens the built document URL', () => {
+    const opened: string[] = [];
+    const card = LatestTenKCard({ filing: BUILT_TEN_K, onOpenLink: (url) => opened.push(url) }) as ReactElement<{ onOpen: () => void }>;
+    card.props.onOpen();
+    expect(opened).toEqual([BUILT.document]);
   });
 });
