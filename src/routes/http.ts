@@ -14,13 +14,15 @@ import { API_PREFIX, buildOpenApiDocument, HEALTH_OPERATION } from '../http/open
 import { lazyLogger, type Log } from '../logging.ts';
 
 import { companyRoutes } from './companies/http.ts';
+import { filingRoutes } from './filings/http.ts';
 import { infoRoute } from './info/http.ts';
 
 /**
  * Every internal HTTP route, each mounted under `/api`. `service_info` is the reference route a
- * new one copies; a route added here is mounted with it. The companies routes follow it.
+ * new one copies; a route added here is mounted with it. The companies routes follow it, then
+ * the filings routes.
  */
-export const ROUTES: readonly RouteSpec[] = [infoRoute, ...companyRoutes];
+export const ROUTES: readonly RouteSpec[] = [infoRoute, ...companyRoutes, ...filingRoutes];
 
 /**
  * The OpenAPI document the service serves: every route in `ROUTES`, and beside them the fixed
