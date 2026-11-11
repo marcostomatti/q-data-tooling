@@ -224,7 +224,7 @@ page's own `tests/web/companies.test.tsx`; no visual or screenshot tests. The na
     `select(ticker, selected)` in `src/web/api.ts` sends `PATCH /api/companies/:ticker` with
     `{ selected }`; `withCompany` puts the server's answer into the page. `CompaniesPage` takes
     `onOpenFilings` for the Filings view stage to wire; `PAGES` does not pass it yet.
-- [ ] Add render tests showing an API error on the Companies page shows a message rather than an empty list, rows render from the API stub, and the switch sends the `PATCH` with an explicit boolean  {agent=tdd-guide effort=medium tests=module}
+- [x] Add render tests showing an API error on the Companies page shows a message rather than an empty list, rows render from the API stub, and the switch sends the `PATCH` with an explicit boolean  {agent=tdd-guide effort=medium tests=module}
   note: render tests are in tests/web/companies.test.tsx; effects need a DOM, so a small hook-dispatcher probe (`settle`) drives CompaniesPage against a recording fetch stub.
 - [ ] Run the Companies page gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}
 
