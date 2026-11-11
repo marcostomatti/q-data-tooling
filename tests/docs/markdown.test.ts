@@ -248,8 +248,9 @@ describe('tracked markdown', () => {
 
 describe('isPlanningDoc', () => {
   test('matches the setup prompts and the spec and plan folders', () => {
-    const planning = ['setup-prompt.md', 'setup-prompt-review.md', 'schema survey review.md',
-      'docs/specs/sec-filings.md', 'docs/plan/sec-filings-setup.md'];
+    const planning = ['setup-prompt.md', 'setup-prompt-review.md', 'schema-survey-review.md',
+      'docs/specs/sec-filings.md', 'docs/plans/PLAN-sec-filings.md',
+      'docs/plans/PLAN_TRACKER-sec-filings.md'];
     expect(planning.filter((file) => !isPlanningDoc(file))).toEqual([]);
   });
 

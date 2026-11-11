@@ -388,8 +388,8 @@ export function listTrackedMarkdown(root: string = REPO_ROOT): readonly string[]
   return [...files].filter((file) => existsSync(join(root, file)));
 }
 
-/** The planning documents: the setup prompt, its review prompts, and `docs/specs/` and `docs/plan/`. */
-const PLANNING_DOC = /^(?:setup-prompt(?:-review)?\.md|schema survey review\.md|docs\/(?:specs|plan)\/.+\.md)$/;
+/** The planning documents: the setup prompt, its review prompts, and `docs/specs/` and `docs/plans/`. */
+const PLANNING_DOC = /^(?:setup-prompt(?:-review)?\.md|schema-survey-review\.md|docs\/(?:specs|plans)\/.+\.md)$/;
 
 /**
  * True for a planning document. A plan names the files its work will create, so the paths and

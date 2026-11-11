@@ -96,8 +96,38 @@ describe('scanWidth (failing control)', () => {
  */
 export const WIDTH_EXEMPT: ReadonlySet<string> = new Set(['NOTES.md']);
 
+/**
+ * Folders the width check skips. `docs/plans/` holds the plans and trackers that
+ * `rafa plan create` and `rafa loop start` write, one task per line however long the task is, so
+ * the house width cannot hold them.
+ */
+export const WIDTH_EXEMPT_DIRS: readonly string[] = ['docs/plans/'];
+
+/**
+ * True when the width check skips `file`.
+ *
+ * @param file - The repo-relative posix path of a markdown file.
+ * @returns Whether `file` is in {@link WIDTH_EXEMPT} or under one of {@link WIDTH_EXEMPT_DIRS}.
+ */
+export function isWidthExempt(file: string): boolean {
+  return WIDTH_EXEMPT.has(file) || WIDTH_EXEMPT_DIRS.some((dir) => file.startsWith(dir));
+}
+
+describe('isWidthExempt', () => {
+  test('skips the log and the rafa plan folder', () => {
+    const exempt = ['NOTES.md', 'docs/plans/PLAN-sec-filings.md',
+      'docs/plans/PLAN_TRACKER-sec-filings.md'];
+    expect(exempt.filter((file) => !isWidthExempt(file))).toEqual([]);
+  });
+
+  test('still reads the spec and every other page', () => {
+    const read = ['README.md', 'docs/specs/sec-filings.md', 'docs/plans.md', 'docs/setup.md'];
+    expect(read.filter((file) => isWidthExempt(file))).toEqual([]);
+  });
+});
+
 describe('tracked markdown (real)', () => {
-  const scan = scanWidth(readTrackedMarkdown().filter((doc) => !WIDTH_EXEMPT.has(doc.file)));
+  const scan = scanWidth(readTrackedMarkdown().filter((doc) => !isWidthExempt(doc.file)));
 
   test('reads prose lines', () => {
     expect(scan.checked).toBeGreaterThan(0);

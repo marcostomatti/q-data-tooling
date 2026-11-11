@@ -38,9 +38,9 @@ export default [
       // code a later task writes, so they name what does not exist yet.
       'setup-prompt.md',
       'setup-prompt-review.md',
-      'schema survey review.md',
+      'schema-survey-review.md',
       'docs/specs/**',
-      'docs/plan/**',
+      'docs/plans/**',
     ],
   },
   ...baseConfig,
