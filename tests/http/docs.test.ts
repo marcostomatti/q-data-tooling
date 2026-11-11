@@ -52,7 +52,7 @@ describe('the API docs behind the /api credential check', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('application/json');
     expect(document.openapi).toStartWith('3.1');
-    expect(Object.keys(document.paths)).toContain('/info');
+    expect(Object.keys(document.paths)).toContain('/api/info');
   });
 
   test('answers the docs page with no inline script, so the default content security policy runs it', async () => {

@@ -29,6 +29,9 @@ for the web app:
 Turn sign-in on when a person needs the web app. A service that only a script calls needs the
 API key and nothing else, so mode `none` is enough.
 
+Every `/auth` route, with the credential it takes, is in the table in `docs/documentation.md`,
+and the service's own API docs at `/api/docs` list the ones the running mode serves.
+
 ### The session cookie
 
 A successful sign-in sets a cookie named `template-service_session`. Its value is a random

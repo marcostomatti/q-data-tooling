@@ -3,15 +3,15 @@ import { z } from 'zod';
 
 import { buildOpenApiDocument, type OpenApiDocument } from '../../src/http/openapi.ts';
 import { route, webRoute, type RouteSpec } from '../../src/http/route.ts';
-import { ROUTES } from '../../src/routes/http.ts';
+import { ROUTES, serviceDocument } from '../../src/routes/http.ts';
 
 /** Made up for this file: the document's name and version, which a test reads back. */
 const INFO = { title: 'Probe service', version: '9.9.9' };
 
 const nothing = async (): Promise<null> => null;
 
-/** The OpenAPI spelling of an Express path: `/items/:itemId` is `/items/{itemId}`. */
-const openApiPath = (path: string): string => path.replace(/:([A-Za-z_$][\w$]*)/g, '{$1}');
+/** The document's path for a route in the table: `/items/:itemId` is `/api/items/{itemId}`. */
+const openApiPath = (path: string): string => `/api${path.replace(/:([A-Za-z_$][\w$]*)/g, '{$1}')}`;
 
 /** The one operation a document holds for `method` and `path`, or a failure naming both. */
 function operation(document: OpenApiDocument, method: string, path: string): Record<string, unknown> {
@@ -24,12 +24,15 @@ function operation(document: OpenApiDocument, method: string, path: string): Rec
 const documentOf = (...routes: RouteSpec[]): OpenApiDocument => buildOpenApiDocument(routes, INFO);
 
 describe('the OpenAPI document', () => {
-  test('is OpenAPI 3.1, names the service and its version, and serves every path under /api', () => {
-    const document = documentOf();
+  test('is OpenAPI 3.1, names the service and its version, and spells each route\'s path under /api', () => {
+    const spec = webRoute('get', '/widgets', z.strictObject({}), { summary: 'Lists widgets.', output: z.null() }, nothing);
+
+    const document = documentOf(spec);
 
     expect(document.openapi).toStartWith('3.1');
     expect(document.info).toMatchObject(INFO);
-    expect(document.servers).toEqual([{ url: '/api' }]);
+    expect(document.servers).toBeUndefined();
+    expect(Object.keys(document.paths ?? {})).toEqual(['/api/widgets']);
   });
 
   test('holds one operation for every route in ROUTES, and none that ROUTES lacks', () => {
@@ -48,7 +51,7 @@ describe('the OpenAPI document', () => {
       output: z.strictObject({ id: z.string() }),
     }, nothing);
 
-    const read = operation(documentOf(spec), 'get', '/items/{itemId}');
+    const read = operation(documentOf(spec), 'get', '/api/items/{itemId}');
 
     expect(read['parameters']).toEqual([
       expect.objectContaining({ in: 'path', name: 'itemId', required: true }),
@@ -63,7 +66,7 @@ describe('the OpenAPI document', () => {
       output: z.strictObject({ id: z.string(), name: z.string() }),
     }, nothing);
 
-    const update = operation(documentOf(spec), 'patch', '/items/{itemId}');
+    const update = operation(documentOf(spec), 'patch', '/api/items/{itemId}');
 
     expect(update['parameters']).toEqual([expect.objectContaining({ in: 'path', name: 'itemId', required: true })]);
     expect(update['requestBody']).toMatchObject({
@@ -80,7 +83,7 @@ describe('the OpenAPI document', () => {
       output: z.strictObject({ removed: z.boolean() }),
     }, nothing, { pathOnly: { listId: z.string() } });
 
-    const remove = operation(documentOf(spec), 'delete', '/lists/{listId}/entries/{entryId}');
+    const remove = operation(documentOf(spec), 'delete', '/api/lists/{listId}/entries/{entryId}');
 
     expect(remove['parameters']).toEqual([
       expect.objectContaining({ in: 'path', name: 'entryId', required: true }),
@@ -91,7 +94,7 @@ describe('the OpenAPI document', () => {
   test('answers a route\'s output inside the success envelope, and every refusal as the error envelope', () => {
     const document = buildOpenApiDocument(ROUTES, INFO);
 
-    const info = operation(document, 'get', '/info');
+    const info = operation(document, 'get', '/api/info');
     const responses = info['responses'] as Record<string, { content: { 'application/json': { schema: unknown } } }>;
 
     expect(responses['200']?.content['application/json'].schema).toMatchObject({
@@ -121,19 +124,30 @@ describe('the OpenAPI document', () => {
       output: z.strictObject({ archived: z.boolean() }),
     }, nothing);
 
-    const archive = operation(documentOf(spec), 'post', '/widgets/{widgetId}/archive');
+    const archive = operation(documentOf(spec), 'post', '/api/widgets/{widgetId}/archive');
 
     expect(archive['summary']).toBe('Archives one widget.');
     expect(archive['tags']).toEqual(['widgets']);
   });
 
-  test('declares the bearer credential the /api check reads, and requires it on every operation', () => {
+  test('declares the two credentials the /api check reads, and takes either on every route', () => {
     const document = buildOpenApiDocument(ROUTES, INFO);
 
     expect(document.components?.securitySchemes?.['bearer']).toEqual({ type: 'http', scheme: 'bearer' });
+    expect(document.components?.securitySchemes?.['session']).toEqual({ type: 'apiKey', in: 'cookie', name: 'template-service_session' });
     for (const spec of ROUTES) {
-      expect(operation(document, spec.method, openApiPath(spec.path))['security']).toEqual([{ bearer: [] }]);
+      expect(operation(document, spec.method, openApiPath(spec.path))['security']).toEqual([{ bearer: [] }, { session: [] }]);
     }
+  });
+
+  test('documents the 403 a signed-in browser\'s write gets without the CSRF header, and none on a read', () => {
+    const read = webRoute('get', '/notes', z.strictObject({}), { summary: 'Lists notes.', output: z.null() }, nothing);
+    const write = webRoute('post', '/notes', z.strictObject({ text: z.string() }), { summary: 'Creates a note.', output: z.null() }, nothing);
+
+    const document = documentOf(read, write);
+
+    expect(Object.keys(operation(document, 'get', '/api/notes')['responses'] as object)).not.toContain('403');
+    expect(Object.keys(operation(document, 'post', '/api/notes')['responses'] as object)).toContain('403');
   });
 
   test('reads a parameter name with digits, underscores or a dollar sign, as Express 5 does', () => {
@@ -142,7 +156,7 @@ describe('the OpenAPI document', () => {
       output: z.strictObject({ id: z.string() }),
     }, nothing);
 
-    const read = operation(documentOf(spec), 'get', '/items/{item_id}/v{rev2}');
+    const read = operation(documentOf(spec), 'get', '/api/items/{item_id}/v{rev2}');
 
     expect(read['parameters']).toEqual([
       expect.objectContaining({ in: 'path', name: 'item_id', required: true }),
@@ -156,7 +170,7 @@ describe('the OpenAPI document', () => {
       output: z.strictObject({ id: z.string() }),
     }, nothing);
 
-    const read = operation(documentOf(spec), 'get', '/things/{thingId}');
+    const read = operation(documentOf(spec), 'get', '/api/things/{thingId}');
 
     expect(read['parameters']).toEqual([expect.objectContaining({ in: 'path', name: 'thingId', required: true })]);
   });
@@ -173,8 +187,8 @@ describe('the OpenAPI document', () => {
 
     const document = documentOf(optional, required);
 
-    expect(operation(document, 'patch', '/notes/{noteId}')['requestBody']).toMatchObject({ required: false });
-    expect(operation(document, 'post', '/notes')['requestBody']).toMatchObject({ required: true });
+    expect(operation(document, 'patch', '/api/notes/{noteId}')['requestBody']).toMatchObject({ required: false });
+    expect(operation(document, 'post', '/api/notes')['requestBody']).toMatchObject({ required: true });
   });
 
   test('refuses, naming the route, a path with an optional segment or a wildcard it cannot split', () => {
@@ -189,5 +203,58 @@ describe('the OpenAPI document', () => {
     const odd = webRoute('post', '/odd', z.string(), { summary: 'Takes a bare string.', output: z.null() }, nothing);
 
     expect(() => documentOf(odd)).toThrow('POST /odd');
+  });
+});
+
+/** Every operation of a document, as `METHOD /path` labels. */
+const labels = (document: OpenApiDocument): string[] => Object.entries(document.paths ?? {})
+  .flatMap(([path, item]) => Object.keys(item ?? {}).map((method) => `${method.toUpperCase()} ${path}`));
+
+describe('the served document', () => {
+  test('lists the health check, with no credential and its own shape', () => {
+    const health = operation(serviceDocument('none'), 'get', '/health');
+
+    expect(health['security']).toEqual([]);
+    expect(Object.keys(health['responses'] as object)).toEqual(['200', '503']);
+  });
+
+  test('lists the document and the docs page under /api, behind the /api credentials', () => {
+    const document = serviceDocument('none');
+
+    for (const path of ['/api/openapi.json', '/api/docs']) {
+      expect({ path, security: operation(document, 'get', path)['security'] }).toEqual({ path, security: [{ bearer: [] }, { session: [] }] });
+    }
+  });
+
+  test('lists only the /auth routes each sign-in mode serves', () => {
+    const authOf = (mode: 'none' | 'password' | 'oidc'): string[] => labels(serviceDocument(mode)).filter((label) => label.includes(' /auth/'))
+      .toSorted();
+    const session = ['GET /auth/session', 'POST /auth/logout'];
+    const tokens = ['GET /auth/tokens', 'POST /auth/tokens', 'DELETE /auth/tokens/{id}'];
+
+    expect(authOf('none')).toEqual(session.toSorted());
+    expect(authOf('password')).toEqual([...session, 'POST /auth/login', ...tokens].toSorted());
+    expect(authOf('oidc')).toEqual([...session, 'GET /auth/oidc/start', 'GET /auth/oidc/callback', ...tokens].toSorted());
+  });
+
+  test('asks the CSRF header on every unsafe /auth route, and a session alone on the token routes', () => {
+    const document = serviceDocument('password');
+
+    const login = operation(document, 'post', '/auth/login');
+    expect(login['parameters']).toEqual([expect.objectContaining({ in: 'header', name: 'x-app-csrf', required: true })]);
+    expect(login['requestBody']).toMatchObject({ required: true, content: { 'application/json': { schema: { properties: { password: { type: 'string' } } } } } });
+    for (const [method, path] of [['get', '/auth/tokens'], ['post', '/auth/tokens'], ['delete', '/auth/tokens/{id}']] as const) {
+      expect({ method, path, security: operation(document, method, path)['security'] }).toEqual({ method, path, security: [{ session: [] }] });
+    }
+  });
+
+  test('answers a new token with 201 and the token, and an unknown token id with 404', () => {
+    const document = serviceDocument('password');
+
+    const create = operation(document, 'post', '/auth/tokens')['responses'] as Record<string, unknown>;
+    const revoke = operation(document, 'delete', '/auth/tokens/{id}')['responses'] as Record<string, unknown>;
+
+    expect(create['201']).toMatchObject({ content: { 'application/json': { schema: { properties: { data: { required: ['token', 'summary'] } } } } } });
+    expect(Object.keys(revoke)).toContain('404');
   });
 });
