@@ -9,6 +9,7 @@ import * as dialect from '../../../src/data/sqlite/index.ts';
 import * as auth from '../../../src/data/sqlite/tables/auth.ts';
 import * as companies from '../../../src/data/sqlite/tables/companies.ts';
 import * as config from '../../../src/data/sqlite/tables/config.ts';
+import * as filings from '../../../src/data/sqlite/tables/filings.ts';
 
 /** Seconds a default timestamp may lie from the test's own clock, for a slow machine. */
 const CLOCK_SLACK_SECONDS = 5;
@@ -31,17 +32,17 @@ function nearNow(date: Date): boolean {
 let db: Awaited<ReturnType<typeof migratedMemoryDb>>;
 
 beforeEach(async () => {
-  db = await migratedMemoryDb({ ...auth, ...companies, ...config });
+  db = await migratedMemoryDb({ ...auth, ...companies, ...config, ...filings });
 });
 
 describe('the SQLite schema', () => {
-  test('declares only the auth tables, the app-config table, companies and company_tickers', () => {
+  test('declares only the auth tables, the app-config table, companies, company_tickers and filings', () => {
     const query = 'select name from sqlite_master where type = \'table\' and name not like \'sqlite_%\' order by name';
     const tables = db.$client
       .query<{ name: string }, []>(query)
       .all()
       .map((row) => row.name);
-    expect(tables).toEqual(['api_token', 'app_config', 'auth_session', 'companies', 'company_tickers']);
+    expect(tables).toEqual(['api_token', 'app_config', 'auth_session', 'companies', 'company_tickers', 'filings']);
   });
 
   test('the index exports its dialect, the client, the dependency and the tables', () => {
@@ -55,6 +56,7 @@ describe('the SQLite schema', () => {
       'companies',
       'companyTickers',
       'dbDependency',
+      'filings',
       'getDb',
       'transact',
     ]);
@@ -229,5 +231,76 @@ describe('the SQLite schema', () => {
 
     // Assert
     expect(keys).toEqual([{ table: 'companies', from: 'cik', to: 'cik', on_delete: 'CASCADE' }]);
+  });
+
+  test('filings reads back its flags, its items and its links as written', () => {
+    // Arrange
+    const filing = {
+      accessionNumber: '0000320193-25-000079',
+      cik: 320193,
+      form: '10-K/A',
+      baseForm: '10-K',
+      isAmendment: true,
+      filingDate: '2025-10-31',
+      reportDate: null,
+      acceptedAt: '2025-10-31T06:01:26.000Z',
+      act: '34',
+      fileNumber: '001-36743',
+      filmNumber: '251393413',
+      items: ['8.01', '9.01'],
+      sizeBytes: 9876543,
+      isXbrl: true,
+      isInlineXbrl: false,
+      primaryDocument: 'aapl-20250927.htm',
+      description: null,
+      documentUrl: 'https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm',
+      indexUrl: 'https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm',
+      folderJsonUrl: 'https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/index.json',
+      inlineXbrlViewerUrl: null,
+      rawXmlUrl: null,
+    };
+
+    // Act
+    db.insert(filings.filings).values(filing)
+      .run();
+    const row = db.select().from(filings.filings)
+      .get();
+
+    // Assert
+    expect(row).toEqual(filing);
+  });
+
+  test('filings defaults items to an empty array', () => {
+    // Act
+    db.insert(filings.filings).values({
+      accessionNumber: '0000320193-25-000080', cik: 320193, form: '8-K', baseForm: '8-K', isAmendment: false, filingDate: '2025-11-01', acceptedAt: '2025-11-01T06:01:26.000Z', sizeBytes: 1, isXbrl: false, isInlineXbrl: false, primaryDocument: 'a.htm', documentUrl: 'https://x', indexUrl: 'https://x', folderJsonUrl: 'https://x',
+    })
+      .run();
+    const row = db.select().from(filings.filings)
+      .get();
+
+    // Assert
+    expect(row?.items).toEqual([]);
+  });
+
+  test('filings keys cik to companies.cik with a cascading delete', () => {
+    // Act
+    const keys = db.$client
+      .query<{ table: string; from: string; to: string; on_delete: string }, []>('select "table", "from", "to", on_delete from pragma_foreign_key_list(\'filings\')')
+      .all();
+
+    // Assert
+    expect(keys).toEqual([{ table: 'companies', from: 'cik', to: 'cik', on_delete: 'CASCADE' }]);
+  });
+
+  test('filings carries the (cik, filing_date desc) and (cik, base_form) indexes', () => {
+    // Act
+    const columns = (index: string) => db.$client
+      .query<{ name: string; desc: number }, []>(`select name, "desc" from pragma_index_xinfo('${index}') where key = 1 order by seqno`)
+      .all();
+
+    // Assert: base_form reads ascending, so the descending check on filing_date can fail.
+    expect(columns('filings_cik_filing_date_idx')).toEqual([{ name: 'cik', desc: 0 }, { name: 'filing_date', desc: 1 }]);
+    expect(columns('filings_cik_base_form_idx')).toEqual([{ name: 'cik', desc: 0 }, { name: 'base_form', desc: 0 }]);
   });
 });
