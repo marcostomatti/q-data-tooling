@@ -7,6 +7,7 @@ import type {
   TokenSummary,
 } from '../auth/contract.ts';
 import type { CompanyListOutput, CompanyUpdateInput, CompanyUpdateOutput } from '../routes/companies/contract.ts';
+import type { FilingListOutput } from '../routes/filings/contract.ts';
 
 export type { AuthMode, CreatedToken, SessionState, SignInState, TokenSummary } from '../auth/contract.ts';
 
@@ -149,3 +150,40 @@ export function createCompaniesClient(fetchImpl: typeof fetch) {
 
 /** The `/api/companies` calls over the browser's own `fetch`. */
 export const companies = createCompaniesClient(fetch);
+
+/** One company and one page of its filings, the `z.infer` type of `FilingListOutput` in `src/routes/filings/contract.ts`. */
+export type FilingPage = FilingListOutput;
+
+/** One filing as the server answers it, an item of {@link FilingPage}. */
+export type Filing = FilingPage['filings']['items'][number];
+
+/**
+ * Builds the `GET /api/companies/:ticker/filings` path for one page, newest first, the route's
+ * own default order. The ticker is encoded so a `/` or `?` in it stays in the segment.
+ *
+ * @param ticker - The company's ticker, such as `AAPL`.
+ * @param page - The page to fetch, from 1.
+ * @param pageSize - The most filings one page holds.
+ * @returns The path with its query string, such as `/api/companies/AAPL/filings?page=1&pageSize=100`.
+ */
+export function filingsPath(ticker: string, page: number, pageSize: number): string {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  return `${companyPath(ticker)}/filings?${params.toString()}`;
+}
+
+/**
+ * The `/api/companies/:ticker/filings` call, going through `fetchImpl`, so a test can hand in a
+ * stand-in. The answer type is imported as a type only, so the bundle does not carry zod for it.
+ *
+ * @param fetchImpl - The `fetch` the call goes through.
+ * @returns The client, whose `list` resolves to the company and one page of its filings, and
+ *   throws an `ApiError` on a refusal, such as the 404 for a ticker no company trades under.
+ */
+export function createFilingsClient(fetchImpl: typeof fetch) {
+  return {
+    list: (ticker: string, page: number, pageSize: number): Promise<FilingPage> => request('GET', filingsPath(ticker, page, pageSize), undefined, fetchImpl),
+  };
+}
+
+/** The `/api/companies/:ticker/filings` call over the browser's own `fetch`. */
+export const filings = createFilingsClient(fetch);

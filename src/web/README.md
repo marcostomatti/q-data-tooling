@@ -12,6 +12,16 @@ Each page is a pair in `src/web/pages/<name>.tsx`:
 - `XView` is pure. It takes props and renders. Tests render it with
   `renderToStaticMarkup` from `react-dom/server`, with no DOM.
 
+## Components
+
+A piece that opens over a page rather than being one sits in
+`src/web/components/<name>.tsx`, with its test in `tests/web/<name>.test.tsx`.
+`filings-view.tsx` is the filings drawer and modal. It keeps the page pair's
+split: `FilingsView` is pure, and `FilingsDialog` holds the state and the
+fetching. The library's `Drawer` and `Modal` render nothing without a DOM, so
+the tests render the pure `FilingsPanel` inside them and read which overlay the
+view returns by calling it.
+
 ## Adding a page to `PAGES`
 
 1. Create `src/web/pages/<name>.tsx` with the `XPage` and `XView` pair.

@@ -30,6 +30,12 @@
       "name": "Response and link validation",
       "commit": "f1146601f1460de5bac52b199dd968359fbb7349",
       "via": "step"
+    },
+    {
+      "stage": 5,
+      "name": "Companies page",
+      "commit": "3253f019f4abce00db3574e1adba466d4dd89561",
+      "via": "step"
     }
   ]
 }

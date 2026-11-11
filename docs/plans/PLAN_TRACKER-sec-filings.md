@@ -226,7 +226,7 @@ page's own `tests/web/companies.test.tsx`; no visual or screenshot tests. The na
     `onOpenFilings` for the Filings view stage to wire; `PAGES` does not pass it yet.
 - [x] Add render tests showing an API error on the Companies page shows a message rather than an empty list, rows render from the API stub, and the switch sends the `PATCH` with an explicit boolean  {agent=tdd-guide effort=medium tests=module}
   note: render tests are in tests/web/companies.test.tsx; effects need a DOM, so a small hook-dispatcher probe (`settle`) drives CompaniesPage against a recording fetch stub.
-- [ ] Run the Companies page gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}
+- [x] Run the Companies page gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}
 
 # Stage: Filings view
 
@@ -238,6 +238,9 @@ cannot hold the links.
 ```
 
 - [ ] Add the filings view `src/web/components/filings-view.tsx`: a `Drawer` (option B) and a full-screen `Modal` (option A) behind one toggle, fed by `GET /companies/:ticker/filings`, topped by an `EntityCard` titled `Latest: 10-K <date>` opening `links.document` and shown only when a 10-K exists  {agent=loop-implementer effort=high}
+  - Note: `FilingsView` (pure) picks `Drawer` size `lg` or a full-screen `Modal` by `layout`; `FilingsDialog` holds the layout and the load, and the wiring task renders it with `ticker` set (unset keeps it closed).
+  - Note: `FilingsPanel` holds a slot-free body: the drawer and modal body tasks add their listing after the latest card. `loadFilings` pages `GET /api/companies/:ticker/filings` at 100 a page, at most 10 pages.
+  - Note: the full-screen modal passes one class string (`Modal` sizes stop at `lg`, 620px), against the web README's variants-only rule.
 - [ ] Add the filings view drawer body: an `Accordion` with one group per tracked form, each child showing the filing date and `primaryDocument`, linking to `links.document` and adding the ix viewer link when present  {agent=loop-implementer effort=medium}
 - [ ] Add the filings view modal body: a 3-column grid with one `SectionCard` per tracked form listing its filings and links  {agent=loop-implementer effort=medium}
 - [ ] Wire the Companies page `onOpenFilings` to open the filings view for the chosen ticker  {agent=loop-implementer effort=low}
