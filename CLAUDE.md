@@ -59,3 +59,14 @@ only the action file it names. Of the `/fe` actions only `empty-page` is built, 
 - `/db update <table>`: creates a column or constraint the stored rows need, as three migrations:
   add it loose, backfill it, then tighten it.
 - `/db migrate`: creates the pending migration for the active dialect, shows its SQL and applies it.
+
+## Additional tooling
+We're using `@open-tomato/rafa` CLI tooling for issues, pr, ci, and other workflow tasks. 
+Run `rafa describe --output=json` the first time to understand usage and capabilities.
+As long as it is the intended next step in the workflow, always prefer the command suggested 
+at the end of the rafa action output over self generated commands that do the same. 
+Refer to rafa's effort storage, learnings and skills for work done in this project as the 
+preferred memory source of truth. 
+
+### Additional contexts
+Use `rafa skills <action>` and `rafa agents <action>` to list an enable the relevant skills and agents for the project. Do once then on request as they are context intensive to list on every session.  
