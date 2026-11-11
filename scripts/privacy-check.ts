@@ -9,8 +9,10 @@
  * given), PNG and JPEG files are read for embedded text metadata, and any other binary is
  * reported once for a person to look at. A lockfile is read by every rule but the `word:` ones,
  * and in a GitHub Actions workflow the `word:` rules read each line without its top-level key.
- * gitleaks then scans the same folder. A finding prints as `file:line rule`, never the text that
- * matched, so the output can be shown and kept without repeating what it found.
+ * gitleaks then scans the same files. Inside a work tree it reads a temporary copy of what git
+ * would track, so an ignored file such as `.env`, or `.tmp/` with its gigabytes, is never handed
+ * to it; outside one it reads the folder whole. A finding prints as `file:line rule`, never the
+ * text that matched, so the output can be shown and kept without repeating what it found.
  *
  * A binary a person has reviewed is listed in `.privacy-reviewed` (`sha256  path` per line) and
  * passes while its content still matches the hash; a changed binary is reported again.
@@ -41,9 +43,19 @@
  *
  * @module
  */
-import { existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join, relative } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
 
 /** A `label<TAB>regex` rule: a finding wherever the pattern matches, unless `allow` says no. */
 export type PatternRule = {
@@ -401,14 +413,53 @@ export async function scanDir(
 
 type GitleaksHit = { readonly File: string; readonly StartLine: number; readonly RuleID: string };
 
-/** gitleaks over the folder, with the config named, or else the one the folder holds. */
+/** The folder gitleaks reads for a scan of `dir`, and how to remove it once read. */
+type GitleaksSource = { readonly folder: string; readonly remove: () => void };
+
+/**
+ * The folder gitleaks reads for `dir`. Inside a work tree it is a temporary copy of the files
+ * {@link scanDir} reads there, what git would track, so gitleaks never sees an ignored file such
+ * as `.env`, the folder `.tmp/` or `.git/`; a symlink is left out, as the text scan reports it
+ * once already. Outside a work tree it is `dir` itself, read whole as the text scan reads it.
+ *
+ * @param dir - The folder the scan was given.
+ * @returns The folder to hand gitleaks, and the clean-up that removes a copy.
+ */
+export function gitleaksSource(dir: string): GitleaksSource {
+  if (!inWorkTree(dir)) return { folder: dir, remove: () => undefined };
+  const folder = mkdtempSync(join(tmpdir(), 'gitleaks-source-'));
+  const remove = () => rmSync(folder, { recursive: true, force: true });
+  try {
+    trackedEntries(dir).filter((entry) => !entry.link)
+      .forEach(({ file, path }) => {
+        mkdirSync(dirname(join(folder, file)), { recursive: true });
+        copyFileSync(path, join(folder, file));
+      });
+  } catch (error) {
+    remove();
+    throw error;
+  }
+  return { folder, remove };
+}
+
+/** `<dir>/.gitleaks.toml` when the folder holds one, the config gitleaks would find there. */
+function folderConfig(dir: string): string | undefined {
+  const path = join(dir, '.gitleaks.toml');
+  return existsSync(path)
+    ? path
+    : undefined;
+}
+
+/** gitleaks over the folder's files, with the config named, or else the one the folder holds. */
 function gitleaks(dir: string, config: string | undefined): readonly Finding[] {
+  const source = gitleaksSource(dir);
   const reportDir = mkdtempSync(join(tmpdir(), 'gitleaks-'));
   const report = join(reportDir, 'report.json');
   try {
-    return gitleaksInto(dir, report, config);
+    return gitleaksInto(source.folder, report, config ?? folderConfig(dir));
   } finally {
     rmSync(reportDir, { recursive: true, force: true });
+    source.remove();
   }
 }
 

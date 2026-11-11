@@ -1,6 +1,6 @@
 import type { Finding, Rule } from '../../scripts/privacy-check.ts';
 
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -310,6 +310,36 @@ describe('the command', () => {
     return bin;
   }
 
+  /**
+   * A `gitleaks` stand-in that reports every file of the folder it is asked to scan, one `listed`
+   * finding each, and writes that folder's path to `seen` beside itself.
+   */
+  function listingGitleaks(): string {
+    const bin = tempDir();
+    const stub = join(bin, 'gitleaks');
+    writeFileSync(stub, [
+      '#!/bin/sh',
+      'for arg; do folder="$arg"; done',
+      'while [ $# -gt 0 ]; do',
+      '  if [ "$1" = "--report-path" ]; then report="$2"; fi',
+      '  shift',
+      'done',
+      `printf '%s' "$folder" > '${join(bin, 'seen')}'`,
+      '{',
+      '  printf "["',
+      '  sep=""',
+      '  /usr/bin/find "$folder" -type f | while IFS= read -r file; do',
+      '    printf \'%s{"File":"%s","StartLine":1,"RuleID":"listed"}\' "$sep" "$file"',
+      '    sep=","',
+      '  done',
+      '  printf "]"',
+      '} > "$report"',
+      '',
+    ].join('\n'));
+    chmodSync(stub, 0o755);
+    return bin;
+  }
+
   /** A folder on `PATH` holding only `git`, so a run finds git and no gitleaks on any host. */
   function gitOnly(): string {
     const bin = tempDir();
@@ -321,10 +351,12 @@ describe('the command', () => {
 
   type Run = { exitCode: number; stdout: string; stderr: string };
 
-  function run(args: readonly string[], { gitleaks = true }: { gitleaks?: boolean } = {}): Run {
+  type RunOptions = { gitleaks?: boolean; stub?: string };
+
+  function run(args: readonly string[], { gitleaks = true, stub }: RunOptions = {}): Run {
     const { PRIVACY_DENYLIST: _denylist, ...inherited } = gitEnv();
     const path = gitleaks
-      ? `${stubGitleaks()}:${gitOnly()}`
+      ? `${stub ?? stubGitleaks()}:${gitOnly()}`
       : gitOnly();
     const env = { ...inherited, PATH: path };
     const result = Bun.spawnSync([process.execPath, SCRIPT, ...args], { env, stdout: 'pipe', stderr: 'pipe' });
@@ -403,5 +435,32 @@ describe('the command', () => {
     const lines = none.stdout.trimEnd().split('\n');
     expect(lines[lines.length - 1]).toBe('gitleaks did not run');
     expect(run([clean]).stdout).not.toContain('gitleaks did not run');
+  });
+
+  test('in a work tree gitleaks reads a copy of what git would track, and the copy is removed', () => {
+    const dir = repo('.env\n.tmp/\n');
+    writeFileSync(join(dir, 'a.txt'), 'fine\n');
+    writeFileSync(join(dir, '.env'), 'fine\n');
+    mkdirSync(join(dir, '.tmp'));
+    writeFileSync(join(dir, '.tmp', 'big.json'), '{}\n');
+    const bin = listingGitleaks();
+
+    const result = run([dir], { stub: bin });
+    const scanned = readFileSync(join(bin, 'seen'), 'utf8');
+
+    expect(result.stderr).toBe('');
+    expect(result.stdout)
+      .toBe('.gitignore:1 gitleaks:listed\na.txt:1 gitleaks:listed\n2 finding(s) (no denylist)\n');
+    expect(scanned).not.toBe(dir);
+    expect(existsSync(scanned)).toBe(false);
+  });
+
+  test('outside a work tree gitleaks reads the folder whole', () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, '.env'), 'fine\n');
+
+    const result = run([dir], { stub: listingGitleaks() });
+
+    expect(result.stdout).toBe('.env:1 gitleaks:listed\n1 finding(s) (no denylist)\n');
   });
 });
