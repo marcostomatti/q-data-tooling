@@ -71,7 +71,7 @@ marking `NOTES.md` skip-worktree, is in [PREREQUISITES-sec-filings.md](PREREQUIS
 - [x] Confirm the template merge `2f3d64c` is in `git log`, `isPlanningDoc` and its two-way tests are in `tests/docs/markdown.ts` and `tests/docs/markdown.test.ts`, `WIDTH_EXEMPT` and `WIDTH_EXEMPT_DIRS` are in `tests/docs/width.test.ts`, the planning-doc ignores are in `eslint.config.mjs`, and `README.md` holds the setup, password, API key, API docs and gates sections, reporting any that is missing as a blocker  {tools=Read,Grep,Glob,Bash model=haiku effort=low}
   - close-out: merge 2f3d64c present in git log; isPlanningDoc and its two tests present; WIDTH_EXEMPT and WIDTH_EXEMPT_DIRS present; planning-doc ignores present in eslint.config.mjs; README has setup, password, API key, API docs and gates content (password and API key are bullets under "Setup and first run", no separate headings). No blockers. tests/docs markdown and width: 35 pass.
 - [x] Add `docs/plans/PLAN-sec-filings.md` to the "Read next" list of `README.md`  {agent=doc-updater effort=low}
-- [ ] Run the project setup gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}
+- [x] Run the project setup gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}
 
 # Stage: Endpoints and contracts
 
@@ -85,6 +85,7 @@ in `src/routes/tools.ts`, and each route in `ROUTES` in `src/routes/http.ts`.
 ```
 
 - [ ] Add `PaginationQuery`, `pageOf`, `Ticker`, `PAGE_SIZE_DEFAULT` and `PAGE_SIZE_MAX` to `src/routes/common.ts` per "Shared route schemas", with unit tests showing `Ticker` accepts lower case and returns upper case  {agent=loop-implementer effort=medium tests=module}
+  - Note: the tests are in `tests/routes/common.test.ts` (10 pass). A control run without `.toUpperCase()` made 2 Ticker tests fail.
 - [ ] Add the entities `Company`, `CompanyTicker`, `Filing`, `FilingLinks`, `TrackedForm` and `toCik10` under `src/entities/` per "Data normalization", with their unit tests  {agent=loop-implementer effort=medium tests=module}
 - [ ] Scaffold `src/routes/companies/` with `/be create-route companies`: `list` (`GET /companies`) and `update` (`PATCH /companies/:ticker`) with the "Endpoint contracts" schemas, stub flows, a `summary` on each route, and the `company_list` and `company_update` tools  {agent=loop-implementer effort=high skills=be tests=module}
 - [ ] Scaffold `src/routes/filings/` with `/be create-route filings`: `list` (`GET /companies/:ticker/filings`) and `summary` (`GET /filings/summary`) with the "Endpoint contracts" schemas, stub flows, a `summary` on each route, and the `filing_list` and `filing_summary` tools  {agent=loop-implementer effort=high skills=be tests=module}

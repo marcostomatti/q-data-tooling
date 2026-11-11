@@ -17,3 +17,44 @@ export const booleanOrText = z.union([z.boolean(), z.enum(['true', 'false']).tra
 /** A row's primary key: a positive whole number, however the surface received it. */
 export const IdSchema = numberOrNumericText.pipe(z.number().int()
   .positive());
+
+/** The page size a list returns when the caller names none. */
+export const PAGE_SIZE_DEFAULT = 25;
+
+/** The largest page size a list accepts; a larger `pageSize` is refused, not clamped. */
+export const PAGE_SIZE_MAX = 100;
+
+/**
+ * The paging fields of a list's query: `page` from 1 and `pageSize` from 1 to
+ * {@link PAGE_SIZE_MAX}, each a number or its digits, defaulting to 1 and
+ * {@link PAGE_SIZE_DEFAULT}. Strict, so a stray field is refused.
+ */
+export const PaginationQuery = z.strictObject({
+  page: numberOrNumericText.pipe(z.number().int()
+    .min(1)).default(1),
+  pageSize: numberOrNumericText.pipe(z.number().int()
+    .min(1)
+    .max(PAGE_SIZE_MAX)).default(PAGE_SIZE_DEFAULT),
+});
+
+/**
+ * Builds the `data` part of a paged list response: one page of items with the paging
+ * fields and the total count across every page. The template wraps it as
+ * `{ success: true, data }`.
+ *
+ * @param item - The schema of one item on the page.
+ * @returns A strict schema of `{ items, page, pageSize, total }`.
+ */
+export const pageOf = <T extends z.ZodType>(item: T) => z.strictObject({
+  items: z.array(item),
+  page: z.number().int(),
+  pageSize: z.number().int(),
+  total: z.number().int(),
+});
+
+/**
+ * A stock ticker: 1 to 10 letters, digits, dots or dashes, in either case, returned
+ * upper case so `brk.b` and `BRK.B` name the same company.
+ */
+export const Ticker = z.string().regex(/^[A-Za-z0-9.-]{1,10}$/)
+  .transform((t) => t.toUpperCase());

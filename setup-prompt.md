@@ -262,7 +262,7 @@ const OverflowFileRef = z.object({
 
 ### Shared route schemas
 
-No pagination helper exists in the template yet; these go in `src/routes/common.ts`, beside
+The template ships no pagination helper; these live in `src/routes/common.ts`, beside
 `IdSchema` and `booleanOrText`. Every response is wrapped by the template as
 `{ success: true, data }`, so `pageOf` is the `data` part.
 

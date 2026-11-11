@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "stages": [
+    {
+      "stage": 0,
+      "name": "Project setup",
+      "commit": "36f4e86950b8a89b1e32eef60c1f18ceed06e51a",
+      "via": "step"
+    }
+  ]
+}
