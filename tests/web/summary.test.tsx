@@ -1,22 +1,31 @@
 import type { CompanySummary, SummaryPage } from '../../src/web/api.ts';
+import type { ReactElement } from 'react';
 
+import { Badge, Button, ConfirmPopover } from '@open-tomato/components';
 import { describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import { createSummaryClient, summaryPath } from '../../src/web/api.ts';
 import { pageFor } from '../../src/web/app.tsx';
+import { TRACKED_FORMS } from '../../src/web/components/filings-view.tsx';
 import {
   AVERAGE_FILINGS_TITLE,
   LATEST_FILING_TITLE,
   NO_LATEST_FILING,
+  REMOVE_CONFIRM_LABEL,
+  REMOVE_LABEL,
+  removeMessage,
   SUMMARY_EMPTY_DESCRIPTION,
   SUMMARY_EMPTY_TITLE,
   SUMMARY_PAGE_SIZE,
   SUMMARY_TITLE,
+  summaryColumns,
   SummaryStatCards,
   summaryStats,
+  SummaryTable,
   SummaryView,
   TOTAL_FILINGS_TITLE,
+  withoutCompany,
 } from '../../src/web/pages/summary.tsx';
 
 const LINKS = {
@@ -127,5 +136,81 @@ describe('the summary client', () => {
     expect(calls).toEqual([{ url: summaryPath(1, SUMMARY_PAGE_SIZE), method: 'GET' }]);
     expect(summaryPath(1, SUMMARY_PAGE_SIZE)).toBe('/api/filings/summary?page=1&pageSize=100');
     expect(answer.items[0]?.ticker).toBe('AAPL');
+  });
+});
+
+type Props = Record<string, unknown>;
+
+function cellOf(key: string, company: CompanySummary, handlers: Parameters<typeof summaryColumns>[0] = {}): ReactElement<Props> {
+  const column = summaryColumns(handlers).find((candidate) => candidate.key === key);
+  if (column?.cell === undefined) throw new Error(`no cell for the ${key} column`);
+  return column.cell(company) as ReactElement<Props>;
+}
+
+describe('the summary table', () => {
+  test('has the ticker, the name, one column per tracked form and Remove last', () => {
+    expect(summaryColumns().map((column) => column.key)).toEqual(['ticker', 'name', ...TRACKED_FORMS, 'remove']);
+  });
+
+  test('draws the ticker as a Badge', () => {
+    const cell = cellOf('ticker', APPLE);
+    expect(cell.type).toBe(Badge);
+    expect(cell.props.children).toBe('AAPL');
+  });
+
+  test('draws the name as a ghost Button that opens the filings of its ticker', () => {
+    const opened: string[] = [];
+    const cell = cellOf('name', APPLE, { onOpenFilings: (ticker) => opened.push(ticker) });
+    expect(cell.type).toBe(Button);
+    expect(cell.props.variant).toBe('ghost');
+    expect(cell.props.children).toBe('AAPL Inc.');
+    (cell.props.onClick as () => void)();
+    expect(opened).toEqual(['AAPL']);
+  });
+
+  test('counts each tracked form in its own column', () => {
+    expect(TRACKED_FORMS.map((form) => cellOf(form, MICROSOFT) as unknown)).toEqual([1, 3, 11]);
+  });
+
+  test('puts Remove behind a ConfirmPopover, so only the confirm removes the company', () => {
+    const removed: string[] = [];
+    const cell = cellOf('remove', APPLE, { onRemove: (ticker) => removed.push(ticker) });
+    expect(cell.type).toBe(ConfirmPopover);
+    expect(cell.props.message).toBe(removeMessage('AAPL Inc.'));
+    expect(cell.props.confirmLabel).toBe(REMOVE_CONFIRM_LABEL);
+    const trigger = cell.props.children as ReactElement<Props>;
+    expect(trigger.type).toBe(Button);
+    expect(trigger.props.children).toBe(REMOVE_LABEL);
+    expect(trigger.props.onClick).toBeUndefined();
+    expect(removed).toEqual([]);
+    (cell.props.onConfirm as () => void)();
+    expect(removed).toEqual(['AAPL']);
+  });
+
+  test('renders one row per company with its ticker, name and counts', () => {
+    const html = renderToStaticMarkup(<SummaryTable companies={[APPLE, MICROSOFT]} />);
+    for (const text of ['AAPL', 'AAPL Inc.', 'MSFT', 'MSFT Inc.', '11', REMOVE_LABEL]) expect(html).toContain(text);
+  });
+
+  test('the view holds the table while the summary lists a company, and not otherwise', () => {
+    const held = renderToStaticMarkup(<SummaryView result={pageOf([APPLE])} />);
+    expect(held).toContain(REMOVE_LABEL);
+    expect(held).toContain('AAPL Inc.');
+    const empty = renderToStaticMarkup(<SummaryView result={pageOf([])} />);
+    expect(empty).not.toContain(REMOVE_LABEL);
+    expect(empty).toContain(SUMMARY_EMPTY_TITLE);
+  });
+});
+
+describe('withoutCompany', () => {
+  test('takes the company out and the total down by one', () => {
+    const next = withoutCompany(pageOf([APPLE, MICROSOFT]), 'AAPL');
+    expect(next.items.map((company) => company.ticker)).toEqual(['MSFT']);
+    expect(next.total).toBe(1);
+  });
+
+  test('a ticker the summary does not hold leaves the same object', () => {
+    const page = pageOf([APPLE]);
+    expect(withoutCompany(page, 'MSFT')).toBe(page);
   });
 });
