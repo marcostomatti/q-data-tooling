@@ -5,7 +5,8 @@
  * it is read by name, not by text: `\s+` between its words crosses line breaks, so a block and its
  * file may wrap a declaration differently. A first line that is not one path, such as a comment in
  * prose, quotes no file; a path holding a placeholder, such as `<plural>`, is skipped by that rule
- * alone.
+ * alone. Planning documents (`isPlanningDoc`) quote files their work has yet to create, so they
+ * are not scanned.
  *
  * @module
  */
@@ -17,7 +18,7 @@ import { join } from 'node:path';
 
 import { describe, expect, test } from 'bun:test';
 
-import { parseMarkdown, readTrackedMarkdown, REPO_ROOT } from './markdown';
+import { isPlanningDoc, parseMarkdown, readTrackedMarkdown, REPO_ROOT } from './markdown';
 
 /** One markdown text to scan, keyed by its repo-relative posix path. */
 interface ScanInput extends Pick<MarkdownDoc, 'fences'> {
@@ -187,7 +188,7 @@ describe('scanQuotedCode (failing control)', () => {
 });
 
 describe('tracked markdown (real)', () => {
-  const scan = scanQuotedCode(readTrackedMarkdown(), readFromCheckout);
+  const scan = scanQuotedCode(readTrackedMarkdown().filter((doc) => !isPlanningDoc(doc.file)), readFromCheckout);
 
   test('reads quoting fences and their names', () => {
     expect(scan.checked.fences).toBeGreaterThan(0);

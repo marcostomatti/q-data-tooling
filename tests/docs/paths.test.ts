@@ -2,7 +2,8 @@
  * The paths check: every backticked repository path and every relative link target in a tracked
  * markdown file names a file or folder that exists. A backticked path is read from the checkout
  * root, a link target from the folder of the file that holds it. A path holding a placeholder,
- * such as `<name>` or `<plural>`, is skipped by that rule alone.
+ * such as `<name>` or `<plural>`, is skipped by that rule alone. Planning documents
+ * (`isPlanningDoc`) name files their work has yet to create, so they are not scanned.
  *
  * @module
  */
@@ -14,7 +15,7 @@ import { join } from 'node:path';
 
 import { describe, expect, test } from 'bun:test';
 
-import { parseMarkdown, readTrackedMarkdown, REPO_ROOT, resolveLink } from './markdown';
+import { isPlanningDoc, parseMarkdown, readTrackedMarkdown, REPO_ROOT, resolveLink } from './markdown';
 
 /** One markdown text to scan, keyed by its repo-relative posix path. */
 interface ScanInput extends Pick<MarkdownDoc, 'spans' | 'links'> {
@@ -176,7 +177,7 @@ describe('scanPaths (failing control)', () => {
 });
 
 describe('tracked markdown (real)', () => {
-  const scan = scanPaths(readTrackedMarkdown(), repoTree());
+  const scan = scanPaths(readTrackedMarkdown().filter((doc) => !isPlanningDoc(doc.file)), repoTree());
 
   test('reads backticked paths and link targets', () => {
     expect(scan.checked.spans).toBeGreaterThan(0);

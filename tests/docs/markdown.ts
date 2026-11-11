@@ -388,6 +388,18 @@ export function listTrackedMarkdown(root: string = REPO_ROOT): readonly string[]
   return [...files].filter((file) => existsSync(join(root, file)));
 }
 
+/** The planning documents: the setup prompt, its review prompts, and `docs/specs/` and `docs/plan/`. */
+const PLANNING_DOC = /^(?:setup-prompt(?:-review)?\.md|schema survey review\.md|docs\/(?:specs|plan)\/.+\.md)$/;
+
+/**
+ * True for a planning document. A plan names the files its work will create, so the paths and
+ * quoted-code checks, which require every named file to exist, skip these files; the width and
+ * link checks still read them.
+ */
+export function isPlanningDoc(file: string): boolean {
+  return PLANNING_DOC.test(file);
+}
+
 /** Every tracked markdown file under `root`, read and parsed. */
 export function readTrackedMarkdown(root: string = REPO_ROOT): readonly TrackedDoc[] {
   return listTrackedMarkdown(root).map((file) => ({

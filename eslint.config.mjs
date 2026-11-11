@@ -32,6 +32,15 @@ export default [
       'data/**',
       // drizzle-kit's generated snapshots and journal.
       'drizzle/**/meta/**',
+      // The assessment's hand-written log, kept exactly as written.
+      'NOTES.md',
+      // The planning documents (`isPlanningDoc` in tests/docs/markdown.ts): their fences sketch
+      // code a later task writes, so they name what does not exist yet.
+      'setup-prompt.md',
+      'setup-prompt-review.md',
+      'schema survey review.md',
+      'docs/specs/**',
+      'docs/plan/**',
     ],
   },
   ...baseConfig,

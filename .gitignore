@@ -29,3 +29,6 @@ src/web/dist/
 
 # The loop ledger: each loop writes it beside the plan; it is not part of the template.
 progress.txt
+
+# macOS folder metadata.
+.DS_Store

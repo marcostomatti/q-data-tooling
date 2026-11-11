@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'bun:test';
 
 import {
+  isPlanningDoc,
   listTrackedMarkdown,
   parseMarkdown,
   readTrackedMarkdown,
@@ -242,5 +243,19 @@ describe('tracked markdown', () => {
     const linked = docs.reduce((sum, d) => sum + d.links.length, 0);
     expect(fenced).toBeGreaterThan(0);
     expect(linked).toBeGreaterThan(0);
+  });
+});
+
+describe('isPlanningDoc', () => {
+  test('matches the setup prompts and the spec and plan folders', () => {
+    const planning = ['setup-prompt.md', 'setup-prompt-review.md', 'schema survey review.md',
+      'docs/specs/sec-filings.md', 'docs/plan/sec-filings-setup.md'];
+    expect(planning.filter((file) => !isPlanningDoc(file))).toEqual([]);
+  });
+
+  test('leaves every other page to the paths and quoted-code checks', () => {
+    const pages = ['README.md', 'CLAUDE.md', 'NOTES.md', 'docs/setup.md', 'docs/specs.md',
+      'src/web/README.md', 'docs/specs/notes.txt'];
+    expect(pages.filter((file) => isPlanningDoc(file))).toEqual([]);
   });
 });

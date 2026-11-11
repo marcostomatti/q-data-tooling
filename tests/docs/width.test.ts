@@ -90,8 +90,14 @@ describe('scanWidth (failing control)', () => {
   });
 });
 
+/**
+ * Files the width check skips. `NOTES.md` is the assessment's hand-written log, kept exactly as
+ * written, so it is not rewrapped to the house width.
+ */
+export const WIDTH_EXEMPT: ReadonlySet<string> = new Set(['NOTES.md']);
+
 describe('tracked markdown (real)', () => {
-  const scan = scanWidth(readTrackedMarkdown());
+  const scan = scanWidth(readTrackedMarkdown().filter((doc) => !WIDTH_EXEMPT.has(doc.file)));
 
   test('reads prose lines', () => {
     expect(scan.checked).toBeGreaterThan(0);
