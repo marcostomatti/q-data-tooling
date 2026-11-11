@@ -42,6 +42,12 @@
       "name": "Filings view",
       "commit": "cbcf594e246cf5afe1f4ef878822aaf03b2e8df6",
       "via": "step"
+    },
+    {
+      "stage": 7,
+      "name": "Summary page",
+      "commit": "3e11f6bb88cc6457a7191ba840dbe4d0be39261a",
+      "via": "step"
     }
   ]
 }
