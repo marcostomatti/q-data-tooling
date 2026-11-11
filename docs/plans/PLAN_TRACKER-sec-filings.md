@@ -95,7 +95,7 @@ in `src/routes/tools.ts`, and each route in `ROUTES` in `src/routes/http.ts`.
 - [x] Add input-schema tests refusing a malformed ticker, an unknown form, `page: 0`, `pageSize: 101`, a stray field, and a `PATCH` body without `selected`, for every input schema of the companies and filings contracts  {agent=tdd-guide effort=medium}
 - [x] Add tests showing each stub flow response of the companies and filings routes and tools passes its output schema  {agent=tdd-guide effort=medium}
 - [x] Extend `tests/http/openapi.test.ts` to hold that the OpenAPI document lists the four routes with their path, query and body fields and the `{ success: true, data }` 200 envelope  {agent=tdd-guide effort=medium tests=module}
-- [ ] Bring `bun run docs:typedoc` to zero warnings over the new contracts, flows, entities and shared schemas by completing their TSDoc  {agent=loop-implementer effort=low skills=documentation}
+- [x] Bring `bun run docs:typedoc` to zero warnings over the new contracts, flows, entities and shared schemas by completing their TSDoc  {agent=loop-implementer effort=low skills=documentation}
   Note: plain `docs:typedoc` already had 0 warnings (notDocumented is off by default). Under `--validation.notDocumented` the in-scope count fell from 128 to 17; those 17 are zod `z.enum` key maps, which a source comment cannot document.
 - [ ] Run the endpoints-and-contracts gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}
 
