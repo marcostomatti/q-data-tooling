@@ -170,8 +170,9 @@ requests per second. `GET /filings/summary` never calls SEC.
   - Tests that mount or register without `sec` keep reading the stored rows only, so no existing test reaches SEC. For the next tasks, `connectTools(defs, db, log, sec)` in `tests/support/tool-harness.ts` and `mountRoutes(app, db, log, 'none', sec)` take a client over a stub `fetch`.
   - The MCP server now refuses to start without a usable `SEC_USER_AGENT`, as `serve` does: it exits 1 with the message on stderr. `tests/mcp/stdio.test.ts` gives the child a made-up value and checks the refusal.
   - Tests: `tests/routes/filings/sec-injection.test.ts`, 10 tests. With `sync: syncSourcesFor(db, sec)` removed from the four call sites, 4 of them failed. Against the base `src/mcp/server.ts`, the stdio refusal test failed.
-- [ ] Add stub-`fetch` tests showing a 403 answers 502 when no rows are stored, and serves the stale rows with their `filingsSyncedAt` when some are  {agent=tdd-guide effort=medium tests=module}
+- [x] Add stub-`fetch` tests showing a 403 answers 502 when no rows are stored, and serves the stale rows with their `filingsSyncedAt` when some are  {agent=tdd-guide effort=medium tests=module}
 - [ ] Add stub-`fetch` tests showing a second request within the TTL makes no SEC call, rows older than the 365-day cutoff are deleted on sync, and the request carries the `SEC_USER_AGENT` value  {agent=tdd-guide effort=medium tests=module}
+  - Tests: `tests/routes/filings/sec-ttl-retention.test.ts`, 3 tests over the real SEC client and a stub `fetch` (TTL: one call across two requests; cutoff: a stored row 400 days old is gone after the sync; User-Agent: the `readSecUserAgent` value reaches the stub). The routes read the wall clock, so the filing dates are computed from it.
 - [ ] Run the SEC-fetching gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}
 
 # Stage: Response and link validation
