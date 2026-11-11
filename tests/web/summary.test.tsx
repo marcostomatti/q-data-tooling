@@ -8,7 +8,7 @@ import { Badge, Button, ConfirmPopover, SectionCard } from '@open-tomato/compone
 import { describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { createSummaryClient, summaryPath } from '../../src/web/api.ts';
+import { createCompaniesClient, createSummaryClient, summaryPath } from '../../src/web/api.ts';
 import { pageFor } from '../../src/web/app.tsx';
 import { TRACKED_FORMS } from '../../src/web/components/filings-view.tsx';
 import {
@@ -19,15 +19,18 @@ import {
   FORM_TONES,
   LATEST_FILING_TITLE,
   NO_LATEST_FILING,
+  COMPANIES_LINK_LABEL,
   REMOVE_CONFIRM_LABEL,
   REMOVE_LABEL,
   removeMessage,
+  COMPANIES_PATH,
   SUMMARY_EMPTY_DESCRIPTION,
   SUMMARY_EMPTY_TITLE,
   SUMMARY_PAGE_SIZE,
   SUMMARY_TITLE,
   SummaryChart,
   summaryColumns,
+  SummaryPage as SummaryPageComponent,
   SummaryStatCards,
   summaryStats,
   SummaryTable,
@@ -35,6 +38,8 @@ import {
   TOTAL_FILINGS_TITLE,
   withoutCompany,
 } from '../../src/web/pages/summary.tsx';
+
+import { settle } from './settle.tsx';
 
 const LINKS = {
   document: 'https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm',
@@ -267,5 +272,61 @@ describe('the summary chart', () => {
     expect(held).toContain(`aria-label="${FILINGS_CHART_LABEL}"`);
     const empty = renderToStaticMarkup(<SummaryView result={pageOf([])} />);
     expect(empty).not.toContain(FILINGS_CHART_TITLE);
+  });
+});
+
+describe('the empty selection', () => {
+  test('points to the Companies page with a link to /companies', () => {
+    const html = renderToStaticMarkup(<SummaryView result={pageOf([])} />);
+    expect(html).toContain(SUMMARY_EMPTY_TITLE);
+    expect(html).toContain(`href="${COMPANIES_PATH}"`);
+    expect(html).toContain(COMPANIES_LINK_LABEL);
+  });
+
+  test('shows no pointer while a company is selected', () => {
+    const html = renderToStaticMarkup(<SummaryView result={pageOf([APPLE])} />);
+    expect(html).not.toContain(COMPANIES_LINK_LABEL);
+  });
+});
+
+describe('the summary page against a fetch stub', () => {
+  function stubFetch(): { fetchImpl: typeof fetch, calls: string[] } {
+    const calls: string[] = [];
+    const fetchImpl = (async (path: string | URL | Request, init?: RequestInit) => {
+      calls.push(`${init?.method} ${String(path)} ${String(init?.body ?? '')}`.trim());
+      return new Response(JSON.stringify({ success: true, data: init?.method === 'PATCH'
+        ? { ticker: 'AAPL', selected: false }
+        : pageOf([APPLE, MICROSOFT]) }));
+    }) as typeof fetch;
+    return { fetchImpl, calls };
+  }
+
+  test('lists the selected companies the summary answers', async () => {
+    const { fetchImpl, calls } = stubFetch();
+    const page = await settle(<SummaryPageComponent api={createSummaryClient(fetchImpl)} removeApi={createCompaniesClient(fetchImpl)} />);
+    page.stop();
+    expect(calls).toEqual([`GET ${summaryPath(1, SUMMARY_PAGE_SIZE)}`]);
+    const html = renderToStaticMarkup(page.tree);
+    for (const text of ['AAPL Inc.', 'MSFT Inc.', REMOVE_LABEL]) expect(html).toContain(text);
+    expect(html.match(new RegExp(`>${REMOVE_LABEL}<`, 'g'))).toHaveLength(2);
+  });
+
+  test('Remove sends nothing until the popover confirms, then sends PATCH selected false and drops the row', async () => {
+    const { fetchImpl, calls } = stubFetch();
+    const page = await settle(<SummaryPageComponent api={createSummaryClient(fetchImpl)} removeApi={createCompaniesClient(fetchImpl)} />);
+    const view = (page.tree.props.children as ReactElement<Record<string, unknown>>[])[0] as ReactElement<Record<string, unknown>>;
+    const cell = summaryColumns({ onRemove: view.props.onRemove as (ticker: string) => void }).find((column) => column.key === 'remove')
+      ?.cell?.(APPLE) as ReactElement<Record<string, unknown>>;
+    expect(cell.type).toBe(ConfirmPopover);
+    await page.flush();
+    expect(calls.filter((call) => call.startsWith('PATCH'))).toEqual([]);
+
+    (cell.props.onConfirm as () => void)();
+    await page.flush();
+    page.stop();
+    expect(calls.filter((call) => call.startsWith('PATCH'))).toEqual(['PATCH /api/companies/AAPL {"selected":false}']);
+    const html = renderToStaticMarkup(page.tree);
+    expect(html).not.toContain('AAPL Inc.');
+    expect(html).toContain('MSFT Inc.');
   });
 });

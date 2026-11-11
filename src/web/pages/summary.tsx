@@ -18,6 +18,12 @@ export const SUMMARY_EMPTY_TITLE = 'Nothing here yet';
 /** What the Summary page will show, as its empty state tells the reader. */
 export const SUMMARY_EMPTY_DESCRIPTION = 'The filings of the selected companies, summed up by form.';
 
+/** Where the Companies page lives, the target of the empty state's pointer. */
+export const COMPANIES_PATH = '/companies';
+
+/** The label of the empty state's link to the Companies page. */
+export const COMPANIES_LINK_LABEL = 'Select companies on the Companies page';
+
 /** The title of the stat card holding the filings of every selected company. */
 export const TOTAL_FILINGS_TITLE = 'Total filings';
 
@@ -321,7 +327,13 @@ export function SummaryView({ result, error, onOpenFilings, onRemove }: SummaryV
       {result !== undefined && <SummaryStatCards stats={summaryStats(items)} />}
       {items.length > 0 && <SummaryTable companies={items} onOpenFilings={onOpenFilings} onRemove={onRemove} />}
       {items.length > 0 && <SummaryChart companies={items} />}
-      {items.length === 0 && <EmptyState title={SUMMARY_EMPTY_TITLE} description={SUMMARY_EMPTY_DESCRIPTION} />}
+      {items.length === 0 && (
+        <EmptyState
+          title={SUMMARY_EMPTY_TITLE}
+          description={SUMMARY_EMPTY_DESCRIPTION}
+          action={<a href={COMPANIES_PATH}>{COMPANIES_LINK_LABEL}</a>}
+        />
+      )}
     </Content>
   );
 }

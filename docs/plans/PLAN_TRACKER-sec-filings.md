@@ -225,6 +225,7 @@ page's own `tests/web/companies.test.tsx`; no visual or screenshot tests. The na
     `{ selected }`; `withCompany` puts the server's answer into the page. `CompaniesPage` takes
     `onOpenFilings` for the Filings view stage to wire; `PAGES` does not pass it yet.
 - [x] Add render tests showing an API error on the Companies page shows a message rather than an empty list, rows render from the API stub, and the switch sends the `PATCH` with an explicit boolean  {agent=tdd-guide effort=medium tests=module}
+  - Note: the empty state gained a link to `COMPANIES_PATH` (`/companies`, `COMPANIES_LINK_LABEL`) as its `action`. `tests/web/settle.tsx` now holds the no-DOM hook driver `settle`, moved out of `companies.test.tsx`; the new `summary.test.tsx` cases drive `SummaryPage` through it with a fetch stub and assert the `PATCH` fires only after the popover's confirm.
   note: render tests are in tests/web/companies.test.tsx; effects need a DOM, so a small hook-dispatcher probe (`settle`) drives CompaniesPage against a recording fetch stub.
 - [x] Run the Companies page gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}
 
@@ -266,9 +267,10 @@ before the loop (PREREQUISITES); a task that finds it missing reports it as a bl
   - Note: the third card is titled `Latest 10-K`, since `GET /filings/summary` carries only each company's `latest10K`. `SummaryPage` now fetches the summary (`createSummaryClient` in `src/web/api.ts`), page 1 with pageSize 100; the table and chart tasks can read the same `result`.
 - [x] Add the Summary page `Table`: ticker `Badge`, the name as a `ghost` `Button` opening the filings view, one column per tracked form, and a Remove button behind `ConfirmPopover` sending `PATCH selected: false`  {agent=loop-implementer effort=high}
   - Note: `SummaryTable` and `summaryColumns` in `src/web/pages/summary.tsx`; Remove sends `select(ticker, false)` through the Companies client (`removeApi` prop) and `withoutCompany` drops the row once the server answers. The page holds its own `FilingsDialog`. The empty state still reads `Nothing here yet` with no pointer to the Companies page, which the render-tests task expects.
-- [ ] Add the Summary page stacked bar chart from `@open-tomato/charts`: filings per company, one stack per tracked form  {agent=loop-implementer effort=medium}
+- [x] Add the Summary page stacked bar chart from `@open-tomato/charts`: filings per company, one stack per tracked form  {agent=loop-implementer effort=medium}
   - Note: `SummaryChart` and `filingsChartData` in `src/web/pages/summary.tsx`, a `SectionCard` holding `echartsEngine.BarChart` in `stacked` mode, below the table and only while the summary lists a company; `FORM_TONES` gives 10-K, 10-Q and 8-K `series-1` to `-3`. `src/web/styles.css` gained `@source` for the charts package and a `@theme static` block defining every chart token over the components library's semantic variables, since neither package ships the values.
-- [ ] Add render tests showing an empty selection shows a pointer to the Companies page, Remove asks first and then sends the `PATCH`, and the table lists the selected companies  {agent=tdd-guide effort=medium tests=module}
+- [x] Add render tests showing an empty selection shows a pointer to the Companies page, Remove asks first and then sends the `PATCH`, and the table lists the selected companies  {agent=tdd-guide effort=medium tests=module}
+  - Note: the empty state gained a link to `COMPANIES_PATH` (`/companies`, `COMPANIES_LINK_LABEL`) as its `action`. `tests/web/settle.tsx` now holds the no-DOM hook driver `settle`, moved out of `companies.test.tsx`; the new `summary.test.tsx` cases drive `SummaryPage` through it with a fetch stub and assert the `PATCH` fires only after the popover's confirm.
 - [ ] Run the Summary page gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}
 
 # Stage: Close-out
