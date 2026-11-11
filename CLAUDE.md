@@ -78,8 +78,10 @@ Resolving a conflict between the two is the project's own call.
 ## Additional tooling
 
 We use the `@open-tomato/rafa` CLI for issues, pull requests, CI and the other workflow tasks;
-`docs/rafa.md` sets it up. Run `rafa describe --output=json` the first time, to learn its
-commands and what they do. When it is the intended next step in the workflow, prefer the command
+`docs/rafa.md` sets it up. Learn one command from `rafa <subject> <action> --help` when you
+need it. `rafa describe --output=json` prints the whole roster, about 240 KB, so run it only in
+an interactive session that asks for it, never in a loop task session, where every session would
+read it again. When it is the intended next step in the workflow, prefer the command
 suggested at the end of a rafa action's output over a self-written command that does the same.
 Treat rafa's effort store, learnings and skills for work done in this project as the preferred
 memory source of truth.
@@ -88,3 +90,4 @@ memory source of truth.
 
 Use `rafa skill <action>` and `rafa agent <action>` to list and enable the skills and agents the
 project needs. Do it once, then only on request, because the lists are long to read every session.
+A loop task session skips it.
