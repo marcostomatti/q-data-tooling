@@ -70,7 +70,7 @@ marking `NOTES.md` skip-worktree, is in [PREREQUISITES-sec-filings.md](PREREQUIS
 
 - [x] Confirm the template merge `2f3d64c` is in `git log`, `isPlanningDoc` and its two-way tests are in `tests/docs/markdown.ts` and `tests/docs/markdown.test.ts`, `WIDTH_EXEMPT` and `WIDTH_EXEMPT_DIRS` are in `tests/docs/width.test.ts`, the planning-doc ignores are in `eslint.config.mjs`, and `README.md` holds the setup, password, API key, API docs and gates sections, reporting any that is missing as a blocker  {tools=Read,Grep,Glob,Bash model=haiku effort=low}
   - close-out: merge 2f3d64c present in git log; isPlanningDoc and its two tests present; WIDTH_EXEMPT and WIDTH_EXEMPT_DIRS present; planning-doc ignores present in eslint.config.mjs; README has setup, password, API key, API docs and gates content (password and API key are bullets under "Setup and first run", no separate headings). No blockers. tests/docs markdown and width: 35 pass.
-- [ ] Add `docs/plans/PLAN-sec-filings.md` to the "Read next" list of `README.md`  {agent=doc-updater effort=low}
+- [x] Add `docs/plans/PLAN-sec-filings.md` to the "Read next" list of `README.md`  {agent=doc-updater effort=low}
 - [ ] Run the project setup gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}
 
 # Stage: Endpoints and contracts
