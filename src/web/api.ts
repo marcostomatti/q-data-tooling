@@ -7,7 +7,7 @@ import type {
   TokenSummary,
 } from '../auth/contract.ts';
 import type { CompanyListOutput, CompanyUpdateInput, CompanyUpdateOutput } from '../routes/companies/contract.ts';
-import type { FilingListOutput } from '../routes/filings/contract.ts';
+import type { FilingListOutput, SummaryOutput } from '../routes/filings/contract.ts';
 
 export type { AuthMode, CreatedToken, SessionState, SignInState, TokenSummary } from '../auth/contract.ts';
 
@@ -187,3 +187,39 @@ export function createFilingsClient(fetchImpl: typeof fetch) {
 
 /** The `/api/companies/:ticker/filings` call over the browser's own `fetch`. */
 export const filings = createFilingsClient(fetch);
+
+/** One page of company summaries, the `z.infer` type of `SummaryOutput` in `src/routes/filings/contract.ts`. */
+export type SummaryPage = SummaryOutput;
+
+/** One company of the summary as the server answers it, an item of {@link SummaryPage}. */
+export type CompanySummary = SummaryPage['items'][number];
+
+/**
+ * Builds the `GET /api/filings/summary` path for one page, every tracked form counted.
+ *
+ * @param page - The page to fetch, from 1.
+ * @param pageSize - The most companies one page holds.
+ * @returns The path with its query string, such as `/api/filings/summary?page=1&pageSize=100`.
+ */
+export function summaryPath(page: number, pageSize: number): string {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  return `/api/filings/summary?${params.toString()}`;
+}
+
+/**
+ * The `/api/filings/summary` call, going through `fetchImpl`, so a test can hand in a stand-in.
+ * The route reads the database only and never calls SEC. The answer type is imported as a type
+ * only, so the bundle does not carry zod for it.
+ *
+ * @param fetchImpl - The `fetch` the call goes through.
+ * @returns The client, whose `list` resolves to one page of the selected companies' summaries
+ *   and throws an `ApiError` on a refusal.
+ */
+export function createSummaryClient(fetchImpl: typeof fetch) {
+  return {
+    list: (page: number, pageSize: number): Promise<SummaryPage> => request('GET', summaryPath(page, pageSize), undefined, fetchImpl),
+  };
+}
+
+/** The `/api/filings/summary` call over the browser's own `fetch`. */
+export const summary = createSummaryClient(fetch);

@@ -260,9 +260,10 @@ triggers an SEC call. The chart comes from `@open-tomato/charts`, installed by t
 before the loop (PREREQUISITES); a task that finds it missing reports it as a blocker.
 ```
 
-- [ ] Scaffold the Summary page with `/fe empty-page summary`  {agent=loop-implementer effort=low skills=fe tests=module}
+- [x] Scaffold the Summary page with `/fe empty-page summary`  {agent=loop-implementer effort=low skills=fe tests=module}
   - Note: nav label `Summary`, icon `chart-column-stacked`, placed after Companies; the fe skill snippets were updated in the same change.
 - [ ] Add the Summary page's three compact `SmallStatCard`: total filings of the selected companies, average per company, latest filing  {agent=loop-implementer effort=medium}
+  - Note: the third card is titled `Latest 10-K`, since `GET /filings/summary` carries only each company's `latest10K`. `SummaryPage` now fetches the summary (`createSummaryClient` in `src/web/api.ts`), page 1 with pageSize 100; the table and chart tasks can read the same `result`.
 - [ ] Add the Summary page `Table`: ticker `Badge`, the name as a `ghost` `Button` opening the filings view, one column per tracked form, and a Remove button behind `ConfirmPopover` sending `PATCH selected: false`  {agent=loop-implementer effort=high}
 - [ ] Add the Summary page stacked bar chart from `@open-tomato/charts`: filings per company, one stack per tracked form  {agent=loop-implementer effort=medium}
 - [ ] Add render tests showing an empty selection shows a pointer to the Companies page, Remove asks first and then sends the `PATCH`, and the table lists the selected companies  {agent=tdd-guide effort=medium tests=module}
