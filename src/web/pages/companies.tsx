@@ -15,6 +15,7 @@ import {
 import { useEffect, useState } from 'react';
 
 import { companies, type Company, type CompanyPage, type CompanyQuery } from '../api.ts';
+import { FilingsDialog, type FilingsApi } from '../components/filings-view.tsx';
 
 /** The Companies page's heading, the same text as its nav entry's label. */
 export const COMPANIES_TITLE = 'Companies';
@@ -275,8 +276,10 @@ export interface CompaniesPageProps {
   readonly api?: CompaniesApi
   /** The first page, for a render with no server. */
   readonly initial?: CompanyPage
-  /** Opens the filings of the company with the ticker; the Filings view wires it. */
+  /** Called with the ticker whose filings view the page opens, after the page opens it. */
   readonly onOpenFilings?: (ticker: string) => void
+  /** The filings view's server call. Defaults to the real one; tests inject a fake. */
+  readonly filingsApi?: FilingsApi
 }
 
 function messageOf(failure: unknown, fallback: string): string {
@@ -290,12 +293,14 @@ function messageOf(failure: unknown, fallback: string): string {
  * `GET /api/companies`, and fetches again whenever the query changes. An answer that arrives
  * after a newer query was sent is dropped. A row's switch sends `PATCH /api/companies/:ticker`
  * with the switch's next state as an explicit boolean, and the server's answer replaces the row.
+ * A row's name opens the filings view for its ticker, and closing the view clears the ticker.
  *
  * @param props - The server calls, the first page and the filings handler, as
  *   {@link CompaniesPageProps} lists them.
  * @returns The page.
  */
-export function CompaniesPage({ api = companies, initial, onOpenFilings }: CompaniesPageProps) {
+export function CompaniesPage({ api = companies, initial, onOpenFilings, filingsApi }: CompaniesPageProps) {
+  const [filingsTicker, setFilingsTicker] = useState<string | undefined>();
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState<CompanyQuery>(INITIAL_QUERY);
   const [result, setResult] = useState<CompanyPage | undefined>(initial);
@@ -336,20 +341,28 @@ export function CompaniesPage({ api = companies, initial, onOpenFilings }: Compa
     );
   };
 
+  const openFilings = (ticker: string): void => {
+    setFilingsTicker(ticker);
+    onOpenFilings?.(ticker);
+  };
+
   const total = result?.total ?? 0;
   return (
-    <CompaniesView
-      result={result}
-      error={error}
-      search={search}
-      selectedOnly={query.selectedOnly}
-      page={query.page}
-      pageCount={pageCountOf(total, query.pageSize)}
-      onSearchChange={setSearch}
-      onSelectedOnlyChange={(next) => setQuery((current) => withSelectedOnly(current, next))}
-      onPageChange={(next) => setQuery((current) => ({ ...current, page: next }))}
-      onOpenFilings={onOpenFilings}
-      onSelectedChange={onSelectedChange}
-    />
+    <>
+      <CompaniesView
+        result={result}
+        error={error}
+        search={search}
+        selectedOnly={query.selectedOnly}
+        page={query.page}
+        pageCount={pageCountOf(total, query.pageSize)}
+        onSearchChange={setSearch}
+        onSelectedOnlyChange={(next) => setQuery((current) => withSelectedOnly(current, next))}
+        onPageChange={(next) => setQuery((current) => ({ ...current, page: next }))}
+        onOpenFilings={openFilings}
+        onSelectedChange={onSelectedChange}
+      />
+      <FilingsDialog ticker={filingsTicker} onClose={() => setFilingsTicker(undefined)} api={filingsApi} />
+    </>
   );
 }

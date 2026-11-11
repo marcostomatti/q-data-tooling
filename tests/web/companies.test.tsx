@@ -7,6 +7,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import { ApiError, createCompaniesClient } from '../../src/web/api.ts';
 import { pageFor } from '../../src/web/app.tsx';
+import { FilingsDialog } from '../../src/web/components/filings-view.tsx';
 import {
   CompaniesPage,
   CompaniesView,
@@ -322,7 +323,37 @@ function recordingFetch(body: unknown, status = 200): { fetchImpl: typeof fetch,
   return { fetchImpl: fetchImpl as typeof fetch, calls };
 }
 
+/** The page's two children: the Companies view, then the filings dialog. */
+function childrenOf(tree: ReactElement<Record<string, unknown>>): ReactElement<Record<string, unknown>>[] {
+  return tree.props.children as ReactElement<Record<string, unknown>>[];
+}
+
+function viewOf(tree: ReactElement<Record<string, unknown>>): ReactElement<Record<string, unknown>> {
+  return childrenOf(tree)[0] as ReactElement<Record<string, unknown>>;
+}
+
+function dialogOf(tree: ReactElement<Record<string, unknown>>): ReactElement<Record<string, unknown>> {
+  return childrenOf(tree)[1] as ReactElement<Record<string, unknown>>;
+}
+
 describe('CompaniesPage against an API stub', () => {
+  test('a row name opens the filings view for its ticker and closing it clears the ticker', async () => {
+    const opened: string[] = [];
+    const page = await settle(<CompaniesPage api={stubApi(TWO)} initial={TWO} onOpenFilings={(ticker) => opened.push(ticker)} />);
+    expect(dialogOf(page.tree).type).toBe(FilingsDialog);
+    expect(dialogOf(page.tree).props.ticker).toBeUndefined();
+
+    (viewOf(page.tree).props.onOpenFilings as (ticker: string) => void)('AAPL');
+    await page.flush();
+    expect(dialogOf(page.tree).props.ticker).toBe('AAPL');
+    expect(opened).toEqual(['AAPL']);
+
+    (dialogOf(page.tree).props.onClose as () => void)();
+    await page.flush();
+    page.stop();
+    expect(dialogOf(page.tree).props.ticker).toBeUndefined();
+  });
+
   test('an API error shows a message and not the empty list', async () => {
     const { fetchImpl, calls } = recordingFetch({ success: false, error: { name: 'Boom', message: 'the registry is down' } }, 503);
     const { tree, stop } = await settle(<CompaniesPage api={createCompaniesClient(fetchImpl)} />);
@@ -365,7 +396,7 @@ describe('CompaniesPage against an API stub', () => {
     expect(calls.length).toBeGreaterThan(0);
     expect(renderToStaticMarkup(page.tree)).toContain('role="switch" aria-checked="true"');
 
-    const onChange = page.tree.props.onSelectedChange as (ticker: string, selected: boolean) => void;
+    const onChange = viewOf(page.tree).props.onSelectedChange as (ticker: string, selected: boolean) => void;
     onChange('AAPL', false);
     await page.flush();
     page.stop();
