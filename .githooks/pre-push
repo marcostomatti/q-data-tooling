@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# Privacy check before a push: every commit the push would add to the remote goes through
+# scripts/privacy-history.sh, and a finding refuses the push. A pushed branch of a public
+# repository is public the moment it lands, and the privacy workflow in CI runs only after that.
+#
+# Turned on per clone, never by an install script: `git config core.hooksPath .githooks`.
+#
+# git hands the hook the remote's name and URL as arguments, and one line per ref on stdin:
+# `<local ref> <local sha> <remote ref> <remote sha>`. Per line:
+#   - a deletion (local sha all zeros) is skipped;
+#   - a ref the remote has scans <remote sha>..<local sha>;
+#   - a new ref scans refs/remotes/<remote>/HEAD..<local sha>, or every commit of <local sha>
+#     when that ref is missing. A remote sha this clone does not hold, after a fetch it has not
+#     made, is treated the same way. Branches and tags are scanned alike.
+#
+# The denylist is PRIVACY_DENYLIST when set, else .rafa/privacy-denylist.tsv in the main
+# checkout, which every worktree of the clone shares. gitleaks is the one on PATH.
+#
+# Strict mode, `git config privacy.strict true`, refuses the push when the denylist file or
+# gitleaks is missing, naming which. Without it, the scan runs with what is present and says
+# what it skipped. The hook prints the scan's own output, which never shows the matched text,
+# and never prints a denylist term or the denylist's path.
+#
+# Exit: 0 the push goes ahead, 1 it is refused.
+set -euo pipefail
+
+remote="${1:-}"
+tag='privacy pre-push:'
+
+say() { printf '%s %s\n' "$tag" "$*" >&2; }
+
+root="$(git rev-parse --show-toplevel)"
+script="$root/scripts/privacy-history.sh"
+if [ ! -f "$script" ]; then
+  say "refusing the push: scripts/privacy-history.sh is missing from this checkout."
+  exit 1
+fi
+
+common="$(git rev-parse --path-format=absolute --git-common-dir)"
+denylist="${PRIVACY_DENYLIST:-$(dirname "$common")/.rafa/privacy-denylist.tsv}"
+strict="$(git config --type=bool --get privacy.strict || true)"
+
+missing=()
+if [ ! -f "$denylist" ]; then missing+=('the denylist file'); fi
+if ! command -v gitleaks > /dev/null 2>&1; then missing+=('gitleaks'); fi
+
+if [ "$strict" = 'true' ] && [ ${#missing[@]} -gt 0 ]; then
+  for item in "${missing[@]}"; do say "strict mode: $item is missing."; done
+  say "refusing the push. Strict mode is privacy.strict in this clone's git config."
+  exit 1
+fi
+
+flags=()
+if [ -f "$denylist" ]; then
+  flags+=(--denylist "$denylist")
+else
+  say 'no denylist file found, so the scan runs without one.'
+fi
+if ! command -v gitleaks > /dev/null 2>&1; then
+  flags+=(--no-gitleaks)
+  say 'gitleaks is not on PATH, so the scan runs without it.'
+fi
+
+# True when the sha is all zeros, git's mark for a ref that does not exist on one side.
+is_zero() { [[ "$1" =~ ^0+$ ]]; }
+
+# The range a new ref scans: what the remote's default branch lacks, or every commit.
+new_ref_range() {
+  local local_sha="$1" base
+  if [ -n "$remote" ] && base="$(git rev-parse --verify -q "refs/remotes/$remote/HEAD")"; then
+    printf '%s..%s' "$base" "$local_sha"
+  else
+    printf '%s' "$local_sha"
+  fi
+}
+
+# Read every line first: the scans below must not read git's stdin.
+lines=()
+while read -r local_ref local_sha remote_ref remote_sha; do
+  lines+=("$local_ref $local_sha $remote_ref $remote_sha")
+done
+
+refused=0
+for line in ${lines[@]+"${lines[@]}"}; do
+  read -r local_ref local_sha _remote_ref remote_sha <<< "$line"
+  if is_zero "$local_sha"; then continue; fi
+
+  if ! is_zero "$remote_sha" && git cat-file -e "$remote_sha^{commit}" 2> /dev/null; then
+    range="$remote_sha..$local_sha"
+  else
+    range="$(new_ref_range "$local_sha")"
+  fi
+
+  status=0
+  output="$(PRIVACY_DENYLIST='' bash "$script" "$range" ${flags[@]+"${flags[@]}"} < /dev/null 2>&1)" ||
+    status=$?
+  if [ "$status" -eq 0 ]; then continue; fi
+
+  refused=1
+  if [ "$status" -eq 1 ]; then
+    say "refusing to push $local_ref: the scan found private data."
+  else
+    say "refusing to push $local_ref: the scan could not run."
+  fi
+  printf '%s\n' "$output" >&2
+done
+
+if [ "$refused" -ne 0 ]; then
+  say 'nothing was pushed. Fix the commits named above, then push again.'
+  exit 1
+fi
+exit 0

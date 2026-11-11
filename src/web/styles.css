@@ -1,0 +1,11 @@
+@import "tailwindcss";
+@import "@open-tomato/components/styles.css";
+
+/* The library's AppShell fills the box its parent gives it and scrolls only its content slot,
+   so the page's root boxes take the whole viewport. Without this the shell is as tall as its
+   content, and the rail stops where the nav ends. */
+html,
+body,
+#root {
+  height: 100%;
+}

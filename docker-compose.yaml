@@ -1,0 +1,25 @@
+# Postgres for the optional Postgres dialect; the default SQLite dialect needs none of this.
+# Pinned so the volume is always template-service_template-service-data, whatever the clone's
+# directory is called.
+name: template-service
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: template-service
+      POSTGRES_PASSWORD: template-service
+      POSTGRES_DB: template-service
+    ports:
+      - '127.0.0.1:${DB_PORT:-5432}:5432'
+    volumes:
+      - template-service-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U template-service -d template-service']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  template-service-data:

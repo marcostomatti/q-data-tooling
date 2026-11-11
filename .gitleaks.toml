@@ -1,0 +1,21 @@
+# gitleaks settings: the default rules, and the made-up values two tests need.
+#
+# Each value is allowed in its own test file only: an allowlist matches when its path and its value
+# both match, so the same value in any other file is still a finding.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "the made-up secret the 500 test of tests/http/handler.test.ts proves is not leaked"
+condition = "AND"
+paths = ['''(^|/)tests/http/handler\.test\.ts$''']
+regexTarget = "line"
+regexes = ['''LEAK-SENTINEL-4f1c''']
+
+[[allowlists]]
+description = "the made-up token tests/web/pages.test.tsx shows once, never in the table"
+condition = "AND"
+paths = ['''(^|/)tests/web/pages\.test\.tsx$''']
+regexTarget = "line"
+regexes = ['''tok_abcd9f8e7d6c5b4a3f2e1d0c9b8a7f6e''']
