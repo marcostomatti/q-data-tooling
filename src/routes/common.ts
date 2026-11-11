@@ -30,8 +30,10 @@ export const PAGE_SIZE_MAX = 100;
  * {@link PAGE_SIZE_DEFAULT}. Strict, so a stray field is refused.
  */
 export const PaginationQuery = z.strictObject({
+  /** The page to return, from 1. */
   page: numberOrNumericText.pipe(z.number().int()
     .min(1)).default(1),
+  /** The most items one page holds, from 1 to {@link PAGE_SIZE_MAX}. */
   pageSize: numberOrNumericText.pipe(z.number().int()
     .min(1)
     .max(PAGE_SIZE_MAX)).default(PAGE_SIZE_DEFAULT),
@@ -46,9 +48,13 @@ export const PaginationQuery = z.strictObject({
  * @returns A strict schema of `{ items, page, pageSize, total }`.
  */
 export const pageOf = <T extends z.ZodType>(item: T) => z.strictObject({
+  /** The items on this page. */
   items: z.array(item),
+  /** The page returned, as asked for. */
   page: z.number().int(),
+  /** The page size asked for. */
   pageSize: z.number().int(),
+  /** The count of matching items across every page. */
   total: z.number().int(),
 });
 

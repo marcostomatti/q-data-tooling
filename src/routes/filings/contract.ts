@@ -19,8 +19,11 @@ export type FilingSort = z.infer<typeof FilingSort>;
  * included, and `sort`, newest first by default. Strict, so a stray field is refused.
  */
 export const FilingListInput = PaginationQuery.extend({
+  /** The ticker from the path, upper cased. */
   ticker: Ticker,
+  /** The base form to keep, amendments included; every tracked form when absent. */
   form: TrackedForm.optional(),
+  /** The order of the filings, newest first by default. */
   sort: FilingSort.default('-filingDate'),
 });
 
@@ -29,7 +32,9 @@ export type FilingListInput = z.infer<typeof FilingListInput>;
 
 /** What `filing_list` answers: the company the ticker names, and one page of its filings. */
 export const FilingListOutput = z.strictObject({
+  /** The company the ticker names. */
   company: Company,
+  /** One page of the company's filings. */
   filings: pageOf(Filing),
 });
 
@@ -40,7 +45,10 @@ export type FilingListOutput = z.infer<typeof FilingListOutput>;
  * The input of `filing_summary`, `GET /filings/summary`: the paging fields, and `form` to narrow
  * the summary to one base form. Strict, so a stray field is refused.
  */
-export const SummaryInput = PaginationQuery.extend({ form: TrackedForm.optional() });
+export const SummaryInput = PaginationQuery.extend({
+  /** The base form to narrow the counts to; every tracked form when absent. */
+  form: TrackedForm.optional(),
+});
 
 /** The parsed input of `filing_summary`, as {@link SummaryInput} reads it. */
 export type SummaryInput = z.infer<typeof SummaryInput>;
@@ -51,11 +59,31 @@ export type SummaryInput = z.infer<typeof SummaryInput>;
  * the last year, and when its filings were last synced.
  */
 export const CompanySummary = z.strictObject({
+  /** The company's SEC Central Index Key. */
   cik: z.number().int(),
+  /** The company's ticker, upper case. */
   ticker: z.string(),
+  /** The company's name as SEC lists it. */
   name: z.string(),
-  counts: z.strictObject({ '10-K': z.number(), '10-Q': z.number(), '8-K': z.number(), total: z.number() }),
-  latest10K: z.strictObject({ filingDate: z.string(), links: FilingLinks }).nullable(),
+  /** The company's filings in the last year, per tracked form, amendments included, and in total. */
+  counts: z.strictObject({
+    /** The count of 10-K filings. */
+    '10-K': z.number(),
+    /** The count of 10-Q filings. */
+    '10-Q': z.number(),
+    /** The count of 8-K filings. */
+    '8-K': z.number(),
+    /** The count across every tracked form. */
+    total: z.number(),
+  }),
+  /** The latest 10-K's filing date and links, or `null` when the company filed none in the last year. */
+  latest10K: z.strictObject({
+    /** The filing date, `YYYY-MM-DD`. */
+    filingDate: z.string(),
+    /** The SEC links of the filing. */
+    links: FilingLinks,
+  }).nullable(),
+  /** When the company's filings were last synced, or `null` before the first sync. */
   filingsSyncedAt: z.string().nullable(),
 });
 

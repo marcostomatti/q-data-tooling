@@ -10,14 +10,19 @@ import { scoped } from '../../logging.ts';
  * at most `limit` long.
  */
 export interface SummaryQuery {
+  /** The base form to narrow the counts to, or `undefined` for every tracked form. */
   readonly form: TrackedForm | undefined
+  /** The count of selected companies to skip. */
   readonly offset: number
+  /** The most summaries to return. */
   readonly limit: number
 }
 
 /** What the filings store answers for a {@link SummaryQuery}: the summaries in its window and the count of every match. */
 export interface SummarySlice {
+  /** The summaries in the window. */
   readonly items: readonly CompanySummary[]
+  /** The count of every selected company. */
   readonly total: number
 }
 
@@ -27,7 +32,12 @@ export interface SummarySlice {
  * `stub.ts`.
  */
 export interface SummarizeFilingsDeps {
-  readonly filings: { summary(query: SummaryQuery): Promise<SummarySlice> }
+  /** The filings store. */
+  readonly filings: {
+    /** Reads the window of selected companies' summaries the query names. */
+    summary(query: SummaryQuery): Promise<SummarySlice>
+  }
+  /** The log bound to the `Filings` domain. */
   readonly log: Log
 }
 

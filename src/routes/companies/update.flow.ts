@@ -11,7 +11,12 @@ import { scoped } from '../../logging.ts';
  * when no company trades under the ticker. This stage passes the fixed stub store from `stub.ts`.
  */
 export interface UpdateCompanyDeps {
-  readonly store: { setSelected(ticker: string, selected: boolean): Promise<Company | undefined> }
+  /** The companies store. */
+  readonly store: {
+    /** Sets the company's `selected` flag and answers it, or `undefined` for an unknown ticker. */
+    setSelected(ticker: string, selected: boolean): Promise<Company | undefined>
+  }
+  /** The log bound to the `Companies` domain. */
   readonly log: Log
 }
 

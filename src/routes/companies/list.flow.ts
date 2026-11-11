@@ -9,15 +9,21 @@ import { scoped } from '../../logging.ts';
  * page covers, `offset` rows in and at most `limit` long.
  */
 export interface CompanyListQuery {
+  /** The ticker prefix or name part to match, or `undefined` to match every company. */
   readonly q: string | undefined
+  /** Keep only the companies in or out of the summary, or `undefined` to keep both. */
   readonly selected: boolean | undefined
+  /** The count of matching rows to skip. */
   readonly offset: number
+  /** The most rows to return. */
   readonly limit: number
 }
 
 /** What the store answers for a {@link CompanyListQuery}: the rows in its window and the count of every match. */
 export interface CompanyListSlice {
+  /** The rows in the window. */
   readonly items: readonly Company[]
+  /** The count of every matching row. */
   readonly total: number
 }
 
@@ -26,7 +32,12 @@ export interface CompanyListSlice {
  * has bound to the `Companies` domain. This stage passes the fixed stub store from `stub.ts`.
  */
 export interface ListCompaniesDeps {
-  readonly store: { list(query: CompanyListQuery): Promise<CompanyListSlice> }
+  /** The companies store. */
+  readonly store: {
+    /** Reads the window of companies the query names. */
+    list(query: CompanyListQuery): Promise<CompanyListSlice>
+  }
+  /** The log bound to the `Companies` domain. */
   readonly log: Log
 }
 

@@ -12,10 +12,12 @@ export const DOMAIN = 'Companies';
  * the companies in the summary or only those out of it. Strict, so a stray field is refused.
  */
 export const CompanyListInput = PaginationQuery.extend({
+  /** A ticker prefix or a part of the name to match, 1 to 100 characters once trimmed. */
   q: z.string().trim()
     .min(1)
     .max(100)
     .optional(),
+  /** Keep only the companies in the summary when `true`, or only those out of it when `false`. */
   selected: booleanOrText.optional(),
 });
 
@@ -34,7 +36,9 @@ export type CompanyListOutput = z.infer<typeof CompanyListOutput>;
  * summary rather than toggling it. Strict, so a stray field is refused.
  */
 export const CompanyUpdateInput = z.strictObject({
+  /** The ticker from the path, upper cased. */
   ticker: Ticker,
+  /** Whether the company is in the summary, set as given and never toggled. */
   selected: z.boolean(),
 });
 

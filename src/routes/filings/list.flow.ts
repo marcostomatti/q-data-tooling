@@ -12,16 +12,23 @@ import { scoped } from '../../logging.ts';
  * `limit` long.
  */
 export interface FilingPageQuery {
+  /** The CIK of the company whose filings to read. */
   readonly cik: number
+  /** The base form to keep, or `undefined` to keep every tracked form. */
   readonly form: TrackedForm | undefined
+  /** The order of the rows. */
   readonly sort: FilingSort
+  /** The count of matching rows to skip. */
   readonly offset: number
+  /** The most rows to return. */
   readonly limit: number
 }
 
 /** What the filings store answers for a {@link FilingPageQuery}: the rows in its window and the count of every match. */
 export interface FilingSlice {
+  /** The rows in the window. */
   readonly items: readonly Filing[]
+  /** The count of every matching row. */
   readonly total: number
 }
 
@@ -32,8 +39,17 @@ export interface FilingSlice {
  * stores from `stub.ts`.
  */
 export interface ListFilingsDeps {
-  readonly companies: { findByTicker(ticker: string): Promise<Company | undefined> }
-  readonly filings: { page(query: FilingPageQuery): Promise<FilingSlice> }
+  /** The companies store. */
+  readonly companies: {
+    /** Answers the company trading under the ticker, or `undefined` when none does. */
+    findByTicker(ticker: string): Promise<Company | undefined>
+  }
+  /** The filings store. */
+  readonly filings: {
+    /** Reads the window of one company's filings the query names. */
+    page(query: FilingPageQuery): Promise<FilingSlice>
+  }
+  /** The log bound to the `Filings` domain. */
   readonly log: Log
 }
 
