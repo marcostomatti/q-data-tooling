@@ -4,8 +4,9 @@ import { boolean, index, integer, jsonb, pgTable, text, timestamp } from 'drizzl
  * A company the SEC lists in `company_tickers.json`, keyed by its unpadded CIK. The seed writes
  * the CIK, the padded CIK, the primary ticker and the name; the header fields read from the
  * submissions document (`exchanges`, `sic`, `sic_description`, `category`, `fiscal_year_end`)
- * stay `[]` or null until the company's first sync. The index on `name` serves the alphabetical
- * list, and the one on `selected` serves the summary's selected companies.
+ * stay `[]` or null until the company's first sync. The index on `name` is the plain one the spec
+ * names; the list orders by `lower(name)`, which it does not serve. The index on `selected`
+ * serves the summary's selected companies.
  */
 export const companies = pgTable('companies', {
   /** The SEC Central Index Key, unpadded: the primary key. */

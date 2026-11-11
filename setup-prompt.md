@@ -557,7 +557,7 @@ writes `src/data/sqlite/tables/<area>.ts` and the `pg` twin. The repositories go
 
 - `companies`: `cik` int PK, `cik10` text unique, `ticker` text, `name`, `selected` bool default
   false, `exchanges` (JSON text), `sic`, `sic_description`, `category`, `fiscal_year_end`,
-  `filings_synced_at`. Index `(name)` for the alphabetical list, and `(selected)`.
+  `filings_synced_at`. Index `(name)` and `(selected)`; the list orders by `lower(name)`, which the `(name)` index does not serve.
 - `company_tickers`: `ticker` text PK, `cik` int FK.
 - `filings`: `accession_number` text PK, `cik` int FK, `form`, `base_form`, `is_amendment`,
   `filing_date`, `report_date`, `accepted_at`, `act`, `file_number`, `film_number`, `items`

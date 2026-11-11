@@ -22,7 +22,7 @@ const TICKERS = {
   '5': { cik_str: 789019, ticker: 'MSFT', title: '100%_Pure Corp' },
 };
 
-/** The names in the order the list must return them: SQLite's binary order of `name`. */
+/** The names in the order the list must return them: alphabetical, without regard to case. */
 const NAMES_IN_ORDER = ['100%_Pure Corp', 'AGNICO EAGLE MINES LTD', 'Apple Inc.', 'BERKSHIRE HATHAWAY INC', 'Walmart Inc.'];
 
 /** A filter matching every company, in one window wide enough for all of them. */
@@ -51,6 +51,24 @@ function selectWithSql(cik: number): void {
 }
 
 describe('listCompanies', () => {
+  test('orders names alphabetically without regard to case, not capitals before small letters', async () => {
+    // Arrange: in binary order `3M CO` precedes `3i GROUP PLC`, and `APTARGROUP, INC.` precedes `APi Group Corp`
+    await seedTickers(db, {
+      '0': { cik_str: 1, ticker: 'TMMM', title: '3M CO' },
+      '1': { cik_str: 2, ticker: 'TIGP', title: '3i GROUP PLC' },
+      '2': { cik_str: 3, ticker: 'APTR', title: 'APTARGROUP, INC.' },
+      '3': { cik_str: 4, ticker: 'APGC', title: 'APi Group Corp' },
+    });
+
+    // Act
+    const names = await listedNames({});
+
+    // Assert
+    const indexOf = (name: string): number => names.indexOf(name);
+    expect(indexOf('3i GROUP PLC')).toBeLessThan(indexOf('3M CO'));
+    expect(indexOf('APi Group Corp')).toBeLessThan(indexOf('APTARGROUP, INC.'));
+  });
+
   test('lists every company by name, each one a valid Company, with the total', async () => {
     // Act
     const page = await listCompanies(db, EVERY);

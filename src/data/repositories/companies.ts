@@ -12,7 +12,7 @@
 import type { Db } from './db.ts';
 import type { Company } from '../../entities/company.ts';
 
-import { and, asc, count, eq, exists, inArray, or, sql, type AnyColumn, type SQL } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, or, sql, type AnyColumn, type SQL } from 'drizzle-orm';
 
 import { companies, companyTickers } from '../active.ts';
 
@@ -78,12 +78,16 @@ function likeAnyCase(column: AnyColumn, pattern: string): SQL {
   return sql`lower(${column}) like lower(${pattern}) escape ${LIKE_ESCAPE}`;
 }
 
-/** The condition `q` sets: a ticker of the company starts with it, or its name contains it. */
+/**
+ * The condition `q` sets: a ticker of the company starts with it, or its name contains it. The
+ * tickers are matched in a subquery that does not refer to the company row, so the database runs
+ * it once; a per-company `exists` would scan `company_tickers` once for each of the companies.
+ */
 function matchesQuery(db: Db, q: string): SQL | undefined {
   const escaped = escapeLike(q);
-  const tickerPrefix = db.select({ ticker: companyTickers.ticker }).from(companyTickers)
-    .where(and(eq(companyTickers.cik, companies.cik), likeAnyCase(companyTickers.ticker, `${escaped}%`)));
-  return or(exists(tickerPrefix), likeAnyCase(companies.name, `%${escaped}%`));
+  const tickerPrefix = db.select({ cik: companyTickers.cik }).from(companyTickers)
+    .where(likeAnyCase(companyTickers.ticker, `${escaped}%`));
+  return or(inArray(companies.cik, tickerPrefix), likeAnyCase(companies.name, `%${escaped}%`));
 }
 
 /** The `where` of a list: every filter the caller set, joined with `and`. */
@@ -125,7 +129,10 @@ function cikOf(db: Db, ticker: string) {
 
 /**
  * One window of companies by name, filtered by `q` and `selected`, and the count of every
- * match. Companies with the same name keep CIK order, so the windows of one list never overlap.
+ * match. The order is alphabetical without regard to case, as `lower(name)` gives it, since the
+ * database's own text order puts `3M CO` before `3i GROUP PLC` and every capital before any
+ * small letter. Names that differ only in case keep the database's order, then CIK order, so
+ * the windows of one list never overlap.
  * A window past the last match is empty and still carries the real total. The window and the
  * count are two reads, not one snapshot: a write between them can make the total disagree
  * with the window by that write.
@@ -139,7 +146,7 @@ export async function listCompanies(db: Db, filter: CompanyListFilter): Promise<
   const where = listCondition(db, filter);
   const rows = await db.select().from(companies)
     .where(where)
-    .orderBy(asc(companies.name), asc(companies.cik))
+    .orderBy(asc(sql`lower(${companies.name})`), asc(companies.name), asc(companies.cik))
     .limit(filter.limit)
     .offset(filter.offset);
   const [counted] = await db.select({ total: count() }).from(companies)
