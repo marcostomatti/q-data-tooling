@@ -6,7 +6,11 @@ MCP or the database.
 
 An entity may import only `zod` and other entities.
 
-Sketch of a note entity, `src/entities/<name>.ts` with `note` as the name (no entity ships yet):
+The entities that ship are `company.ts` (`Company`, `CompanyTicker`, `toCik10`) and `filing.ts`
+(`Filing`, `FilingLinks`, `TrackedForm`). Each names its schema and its inferred type alike, so
+`Company` is both.
+
+Sketch of a note entity, `src/entities/<name>.ts` with `note` as the name:
 
 ```ts
 import { z } from 'zod';

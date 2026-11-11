@@ -84,9 +84,10 @@ Database and seed stage wires them to repositories. Every `route()` call passes 
 in `src/routes/tools.ts`, and each route in `ROUTES` in `src/routes/http.ts`.
 ```
 
-- [ ] Add `PaginationQuery`, `pageOf`, `Ticker`, `PAGE_SIZE_DEFAULT` and `PAGE_SIZE_MAX` to `src/routes/common.ts` per "Shared route schemas", with unit tests showing `Ticker` accepts lower case and returns upper case  {agent=loop-implementer effort=medium tests=module}
+- [x] Add `PaginationQuery`, `pageOf`, `Ticker`, `PAGE_SIZE_DEFAULT` and `PAGE_SIZE_MAX` to `src/routes/common.ts` per "Shared route schemas", with unit tests showing `Ticker` accepts lower case and returns upper case  {agent=loop-implementer effort=medium tests=module}
   - Note: the tests are in `tests/routes/common.test.ts` (10 pass). A control run without `.toUpperCase()` made 2 Ticker tests fail.
 - [ ] Add the entities `Company`, `CompanyTicker`, `Filing`, `FilingLinks`, `TrackedForm` and `toCik10` under `src/entities/` per "Data normalization", with their unit tests  {agent=loop-implementer effort=medium tests=module}
+  - Note: `src/entities/company.ts` and `src/entities/filing.ts`; tests in `tests/entities/` (21 pass). A control run without `.strict()` and with `padStart(9)` failed 3 tests.
 - [ ] Scaffold `src/routes/companies/` with `/be create-route companies`: `list` (`GET /companies`) and `update` (`PATCH /companies/:ticker`) with the "Endpoint contracts" schemas, stub flows, a `summary` on each route, and the `company_list` and `company_update` tools  {agent=loop-implementer effort=high skills=be tests=module}
 - [ ] Scaffold `src/routes/filings/` with `/be create-route filings`: `list` (`GET /companies/:ticker/filings`) and `summary` (`GET /filings/summary`) with the "Endpoint contracts" schemas, stub flows, a `summary` on each route, and the `filing_list` and `filing_summary` tools  {agent=loop-implementer effort=high skills=be tests=module}
 - [ ] Add input-schema tests refusing a malformed ticker, an unknown form, `page: 0`, `pageSize: 101`, a stray field, and a `PATCH` body without `selected`, for every input schema of the companies and filings contracts  {agent=tdd-guide effort=medium}
