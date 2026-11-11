@@ -9,6 +9,15 @@ import {
   statusFor,
 } from '../src/errors.ts';
 import { errorResult } from '../src/mcp/result.ts';
+import {
+  SecForbiddenError,
+  SecNetworkError,
+  SecNotFoundError,
+  SecRateLimitedError,
+  SecRequestError,
+} from '../src/sec/client.ts';
+
+const SEC_URL = 'https://data.sec.gov/submissions/CIK0000320193.json';
 
 function textOf(result: ReturnType<typeof errorResult>): string {
   const [first] = result.content;
@@ -33,6 +42,14 @@ describe('statusFor', () => {
     }
 
     expect(statusFor(new DuplicateWidgetError())).toBe(409);
+  });
+
+  test('statusFor sends every SEC failure to 502, whatever SEC answered or when it did not answer', () => {
+    expect(statusFor(new SecForbiddenError(SEC_URL))).toBe(502);
+    expect(statusFor(new SecNotFoundError(SEC_URL))).toBe(502);
+    expect(statusFor(new SecRateLimitedError(SEC_URL))).toBe(502);
+    expect(statusFor(new SecNetworkError(SEC_URL, 'the connection failed'))).toBe(502);
+    expect(statusFor(new SecRequestError(503, SEC_URL, `SEC failed ${SEC_URL} (503)`))).toBe(502);
   });
 
   test('statusFor sends an unknown error to 500', () => {
@@ -94,6 +111,14 @@ describe('describeError', () => {
 
     expect(described).toEqual({ name: 'BulkItemError', message: 'bulk item 4 failed: route 3 does not exist' });
     expect(JSON.parse(textOf(errorResult(error)))).toEqual({ error: described });
+  });
+
+  test('describeError shows an SEC failure\'s name and its message with the SEC status, and never its cause', () => {
+    const error = new SecNetworkError(SEC_URL, 'the connection failed', { cause: new Error('getaddrinfo ENOTFOUND data.sec.gov') });
+
+    expect(describeError(new SecForbiddenError(SEC_URL))).toEqual({ name: 'SecForbiddenError', message: new SecForbiddenError(SEC_URL).message });
+    expect(describeError(new SecForbiddenError(SEC_URL)).message).toContain('(403)');
+    expect(describeError(error)).toEqual({ name: 'SecNetworkError', message: `SEC could not be reached for ${SEC_URL}: the connection failed` });
   });
 
   test('describeError returns the flat internal error for an unknown error', () => {

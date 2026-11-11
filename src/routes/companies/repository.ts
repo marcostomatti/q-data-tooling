@@ -10,7 +10,7 @@ import type { CompanyListQuery, CompanyListSlice } from './list.flow.ts';
 import type { Db } from '../../data/repositories/db.ts';
 import type { Company } from '../../entities/company.ts';
 
-import { listCompanies, setCompanySelected } from '../../data/repositories/companies.ts';
+import { findCompanyByTicker, listCompanies, setCompanySelected } from '../../data/repositories/companies.ts';
 
 /** The store {@link companyStore} builds: it fits `ListCompaniesDeps` and `UpdateCompanyDeps` by shape. */
 export interface CompanyStore {
@@ -22,6 +22,14 @@ export interface CompanyStore {
    * @throws When the database refuses the read.
    */
   list(query: CompanyListQuery): Promise<CompanyListSlice>
+  /**
+   * The company trading under the ticker, primary or secondary.
+   *
+   * @param ticker - The upper-case ticker.
+   * @returns The company, or `undefined` when no company trades under the ticker.
+   * @throws When the database refuses the read.
+   */
+  findByTicker(ticker: string): Promise<Company | undefined>
   /**
    * Sets the `selected` flag of the company that trades under the ticker, primary or secondary.
    *
@@ -42,6 +50,7 @@ export interface CompanyStore {
 export function companyStore(db: Db): CompanyStore {
   return {
     list: async (query) => listCompanies(db, query),
+    findByTicker: async (ticker) => findCompanyByTicker(db, ticker),
     setSelected: async (ticker, selected) => setCompanySelected(db, ticker, selected),
   };
 }

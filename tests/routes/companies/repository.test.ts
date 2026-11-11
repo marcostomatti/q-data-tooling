@@ -17,6 +17,22 @@ afterEach(() => {
   db.$client.close();
 });
 
+describe('companyStore(db).findByTicker', () => {
+  test('resolves a primary and a secondary ticker to the same company', async () => {
+    const store = companyStore(db);
+
+    const [primary, secondary] = await Promise.all([store.findByTicker('AEM'), store.findByTicker('AEMRF')]);
+
+    expect(primary).toMatchObject({ cik: 2809, ticker: 'AEM' });
+    expect(secondary).toEqual(primary);
+    expect(Company.safeParse(primary).success).toBe(true);
+  });
+
+  test('answers undefined for a ticker no company trades under', async () => {
+    expect(await companyStore(db).findByTicker('NOPE')).toBeUndefined();
+  });
+});
+
 describe('companyStore(db).list', () => {
   test('answers the stored companies by name in the window, each a valid Company, with the total', async () => {
     const slice = await companyStore(db).list({ q: undefined, selected: undefined, offset: 1, limit: 2 });
