@@ -19,6 +19,7 @@ import { auth, type SessionState } from './api.ts';
 import { CompaniesPage } from './pages/companies.tsx';
 import { HomePage } from './pages/home.tsx';
 import { LoginPage } from './pages/login.tsx';
+import { SummaryPage } from './pages/summary.tsx';
 import { TokensPage } from './pages/tokens.tsx';
 
 /** One page the signed-in app shows, and its place in the nav. */
@@ -34,6 +35,7 @@ export interface AppPage {
 export const PAGES: readonly AppPage[] = [
   { path: APP.landing.path, label: APP.landing.label, icon: 'house', render: () => <HomePage /> },
   { path: '/companies', label: 'Companies', icon: 'building-2', render: () => <CompaniesPage /> },
+  { path: '/summary', label: 'Summary', icon: 'chart-column-stacked', render: () => <SummaryPage /> },
   { path: '/tokens', label: 'Tokens', icon: 'key-round', render: () => <TokensPage /> },
 ];
 

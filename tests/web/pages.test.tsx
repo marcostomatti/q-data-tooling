@@ -280,8 +280,8 @@ describe('TokensView', () => {
 });
 
 describe('the page table', () => {
-  test('holds the landing page from the app config, then companies, then tokens', () => {
-    expect(PAGES.map((page) => page.path)).toEqual([APP.landing.path, '/companies', '/tokens']);
+  test('holds the landing page from the app config, then companies, then summary, then tokens', () => {
+    expect(PAGES.map((page) => page.path)).toEqual([APP.landing.path, '/companies', '/summary', '/tokens']);
     expect(PAGES[0]?.label).toBe(APP.landing.label);
   });
 
@@ -297,11 +297,11 @@ describe('the page table', () => {
 });
 
 describe('the pages together', () => {
-  test('/ and an unknown path land on the landing path, and PAGES holds only landing, /companies and /tokens', () => {
+  test('/ and an unknown path land on the landing path, and PAGES holds only landing, /companies, /summary and /tokens', () => {
     expect(pageFor('/').path).toBe(APP.landing.path);
     expect(pageFor('/nowhere').path).toBe(APP.landing.path);
-    expect(PAGES).toHaveLength(3);
-    expect(PAGES.map((page) => page.path)).toEqual([APP.landing.path, '/companies', '/tokens']);
+    expect(PAGES).toHaveLength(4);
+    expect(PAGES.map((page) => page.path)).toEqual([APP.landing.path, '/companies', '/summary', '/tokens']);
   });
 
   test.each(PAGES.map((page) => page.path))('the nav holds one entry per PAGES entry around the page at %s', (path) => {

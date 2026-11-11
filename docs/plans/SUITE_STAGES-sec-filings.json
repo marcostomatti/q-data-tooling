@@ -36,6 +36,12 @@
       "name": "Companies page",
       "commit": "3253f019f4abce00db3574e1adba466d4dd89561",
       "via": "step"
+    },
+    {
+      "stage": 6,
+      "name": "Filings view",
+      "commit": "cbcf594e246cf5afe1f4ef878822aaf03b2e8df6",
+      "via": "step"
     }
   ]
 }
