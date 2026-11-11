@@ -21,6 +21,7 @@
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^9.1.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
+    "@open-tomato/charts": "^0.1.2",
     "@open-tomato/components": "0.1.1",
     "@open-tomato/service": "^2.0.0",
     "@open-tomato/service-express": "^2.0.0",
