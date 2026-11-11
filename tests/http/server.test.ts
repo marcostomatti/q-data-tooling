@@ -18,6 +18,7 @@ import { closeDb, getDb, type ActiveClient } from '../../src/data/active.ts';
 import { setBackupSettings } from '../../src/data/repositories/config.ts';
 import { MEMORY_DATABASE } from '../../src/data/sqlite/client.ts';
 import { APP_PATHS, backupOptionsFor, startService } from '../../src/http/server.ts';
+import { InvalidSecUserAgentError } from '../../src/sec/config.ts';
 import { countingDb } from '../backup/db-proxies.ts';
 import { captureLog } from '../support/capture-log.ts';
 import { startInTest } from '../support/service-process.ts';
@@ -29,6 +30,9 @@ import { openMigratedMemoryDb, type SqliteTestClient } from '../support/sqlite-d
  */
 const TEST_KEY = 'test-key-for-the-server-entry-'.padEnd(GENERATED_KEY_LENGTH, 'k');
 
+/** A made-up SEC User-Agent at a reserved domain; no test here reaches SEC with it. */
+const TEST_SEC_USER_AGENT = 'q-data-tooling server tests tests@example.com';
+
 type Running = { readonly handle: ServiceHandle };
 
 const savedEnv = {
@@ -36,6 +40,7 @@ const savedEnv = {
   authMode: process.env.AUTH_MODE,
   databaseUrl: process.env.DATABASE_URL,
   logLevel: process.env.LOG_LEVEL,
+  secUserAgent: process.env.SEC_USER_AGENT,
 };
 let running: Running | undefined;
 
@@ -108,6 +113,8 @@ afterAll(() => {
 
 beforeEach(async () => {
   process.env.API_KEY = TEST_KEY;
+  // Set here and not left to `.env`, which Bun loads into the tests: without it no start succeeds.
+  process.env.SEC_USER_AGENT = TEST_SEC_USER_AGENT;
   // No login mode, whatever `.env` sets: Bun loads `.env` into the tests, and `bun run
   // set-password` writes `AUTH_MODE=password` there, which would let the service start without
   // an API_KEY and hide the key refusal the tests below assert.
@@ -123,6 +130,7 @@ afterEach(async () => {
   restore('API_KEY', savedEnv.apiKey);
   restore('AUTH_MODE', savedEnv.authMode);
   restore('DATABASE_URL', savedEnv.databaseUrl);
+  restore('SEC_USER_AGENT', savedEnv.secUserAgent);
 });
 
 function restore(name: string, value: string | undefined): void {
@@ -160,6 +168,35 @@ describe('startService', () => {
 
     expect(failure).toBeInstanceOf(Error);
     expect((failure as Error).message).toContain('setApiKey');
+  });
+
+  test.each([
+    ['unset', undefined],
+    ['empty', ''],
+    ['blank', '   '],
+    ['without a contact email', 'q-data-tooling'],
+  ])('with SEC_USER_AGENT %s and an API_KEY set, refuses to start before the database or any listener is touched', async (_label, value) => {
+    restore('SEC_USER_AGENT', value);
+    // As in the API_KEY refusal: a check that ran after the client opened would surface the
+    // database's refusal instead, and the message tells the two orders apart.
+    process.env.DATABASE_URL = 'postgres://nobody:unused@localhost:1/nothing';
+    await closeDb();
+    let failure: unknown;
+
+    const ports = await listenedPorts(async () => {
+      failure = await startService().catch((error: unknown) => error);
+    });
+
+    expect(failure).toBeInstanceOf(InvalidSecUserAgentError);
+    expect((failure as Error).message).toMatch(/SEC_USER_AGENT/);
+    expect((failure as Error).message).not.toMatch(/database|API_KEY/i);
+    expect(ports).toEqual([]);
+  });
+
+  test('starts with the SEC_USER_AGENT beforeEach sets (control for the refusal)', async () => {
+    const { handle } = await start();
+
+    expect(await answers(handle.url)).toBe(true);
   });
 
   test.each([0, 70_000, 80.5, Number.NaN])('refuses a port option of %s before opening anything', async (port) => {

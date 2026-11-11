@@ -13,6 +13,7 @@ import { DEFAULT_BACKUP_DIR, startBackupSchedule, type BackupWiring } from '../b
 import { dbDependency, getDb } from '../data/active.ts';
 import { inDomain, lazyLogger, scoped, type Log } from '../logging.ts';
 import { mountRoutes } from '../routes/http.ts';
+import { readSecUserAgent } from '../sec/config.ts';
 
 const MAX_PORT = 65_535;
 
@@ -156,7 +157,9 @@ function startBackups(db: ReturnType<typeof getDb>, wiring: BackupWiring | undef
  * `cors` is unset too: the app and the API share one origin and one port.
  */
 export async function startService(opts: StartOptions = {}): Promise<ServiceHandle> {
-  // Both are read before anything opens, so a wrong setting stops the start with its own message.
+  // All are read before anything opens, so a wrong setting stops the start with its own message.
+  // The SEC User-Agent goes first: without it no filings sync could succeed, whatever opens /api.
+  readSecUserAgent(process.env);
   const auth = parseAuthConfig(process.env);
   const apiKey = configuredApiKey(process.env, auth);
   const port = resolvePort(opts.port, process.env);

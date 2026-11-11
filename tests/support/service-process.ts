@@ -53,9 +53,16 @@ export interface ServiceProcess {
  * Set unless the caller names its own. The service's loggers, the chassis's request logger among
  * them, read `LOG_LEVEL` when they are made, and a test reads none of what they write. `PORT` and
  * `PORT_STRICT` are unset so a developer's `.env`, which `bun test` loads, cannot move the run off
- * the port the OS picks or make a taken port an error.
+ * the port the OS picks or make a taken port an error. `SEC_USER_AGENT` is a made-up value at a
+ * reserved domain, because the service does not start without one, and a run must not depend on
+ * a developer's `.env` holding it; no test reaches SEC with it.
  */
-const DEFAULT_ENV: ServiceEnv = { LOG_LEVEL: 'silent', PORT: undefined, PORT_STRICT: undefined };
+const DEFAULT_ENV: ServiceEnv = {
+  LOG_LEVEL: 'silent',
+  PORT: undefined,
+  PORT_STRICT: undefined,
+  SEC_USER_AGENT: 'q-data-tooling tests tests@example.com',
+};
 
 /** Whether a run is live: the active database is one per process, so two runs would share it. */
 let running = false;
@@ -85,7 +92,8 @@ function setVariable(name: string, value: string | undefined): void {
  * A start that fails restores the environment and closes the database before it rethrows, so
  * the caller has nothing to clean up.
  *
- * @param env - The variables to set for the run, on top of `LOG_LEVEL=silent`.
+ * @param env - The variables to set for the run, on top of `LOG_LEVEL=silent` and a test
+ *   `SEC_USER_AGENT`.
  * @param opts - Passed to `startService` as they are.
  * @returns The origin the service listens on and its `stop()`.
  * @throws {Error} when `env` names `DATABASE_URL`, or another run has not been stopped.

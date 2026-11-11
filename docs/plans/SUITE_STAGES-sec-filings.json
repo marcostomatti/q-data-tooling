@@ -12,6 +12,12 @@
       "name": "Endpoints and contracts",
       "commit": "77ea47f5986bde119d51d8f9d405ebc282a09bf7",
       "via": "step"
+    },
+    {
+      "stage": 2,
+      "name": "Database and seed",
+      "commit": "f67eb5d29073d146d92b46b195f5f9519f27097a",
+      "via": "step"
     }
   ]
 }

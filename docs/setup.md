@@ -33,9 +33,11 @@ cp .env.example .env
 ```
 
 Every line of `.env.example` is commented out, so the copy sets nothing and the defaults apply:
-SQLite at `./data/app.db`, no sign-in and no notebook tools. One thing is not a default: the
-service does not start until `API_KEY` or `AUTH_MODE` is set. The first run below sets
-`API_KEY`. The [configuration](#configuration) section lists every variable.
+SQLite at `./data/app.db`, no sign-in and no notebook tools. Two things are not defaults: the
+service does not start until `API_KEY` or `AUTH_MODE` is set, and it does not start until
+`SEC_USER_AGENT` is set. The first run below sets `API_KEY`; set `SEC_USER_AGENT` in `.env` by
+hand, as `"<app name> <contact email>"`. The [configuration](#configuration) section lists every
+variable.
 
 ## The first migration
 
@@ -57,7 +59,7 @@ clean database exits 0.
 
 ## The first run
 
-Write an API key into `.env`, then start the server:
+With `SEC_USER_AGENT` set in `.env`, write an API key into it, then start the server:
 
 ```sh
 bun run setApiKey --burn-after-reading
@@ -124,6 +126,7 @@ ignores the file. Two notes apply to the whole table:
 | `PG_DUMP_BIN` | unset, `pg_dump` from `PATH` | The `pg_dump` the Postgres backup runs, read at each dump. `scripts/pg_dump-docker.sh` runs the container's copy. | `src/backup/pg-dump.ts` |
 | `TEST_PG_URL` | unset | A Postgres URL for the tests that need a server. The Postgres suites are skipped when it is unset. Point it at a test database. | `scripts/test-db.ts`, `tests/data/migrate.test.ts` |
 | `API_KEY` | unset | The key that opens `/api` for a client. `bun run setApiKey` writes it. With neither `API_KEY` nor `AUTH_MODE`, the service refuses to start. | `src/http/server.ts`, `src/auth/access.ts`, `src/auth/set-api-key.ts` |
+| `SEC_USER_AGENT` | unset, required | The User-Agent sent with every request to SEC, as `"<app name> <contact email>"`. SEC answers 403 to a request without one, so the service refuses to start when it is unset, blank, holds no contact email or holds a line break. | `src/sec/config.ts`, `src/http/server.ts` |
 | `AUTH_MODE` | unset, no sign-in | `password` or `oidc`, one at a time. Any other value stops the start. | `src/auth/config.ts`, `src/auth/set-password.ts` |
 | `AUTH_PASSWORD_HASH` | unset | The scrypt hash of the one password, for `AUTH_MODE=password`. `bun run set-password` writes it. A plain password is refused. | `src/auth/config.ts`, `src/auth/reset-credentials.ts` |
 | `AUTH_COOKIE_SECURE` | unset, `false` | `true` marks the session cookie `Secure`, for a service behind an HTTPS proxy. | `src/auth/cookies.ts` |
