@@ -105,7 +105,10 @@ default. Run every step for both dialects, whichever is active.
    `src/data/seeds/<NN>-<name>.ts` as `.claude/skills/db/reference/data-changes.md` describes.
    If it does not, say so: the template ships no seeds.
 
-8. **Verify.** Run
+8. **Document it.** Give each table and each column whose name does not say it all a TSDoc block,
+   `/** ... */` before it, in both dialects' files. `docs/documentation.md` holds the rules.
+
+9. **Verify.** Run
    `bun run typecheck && bun run typecheck:pg && bun run lint && bun test tests/data`. The
    Postgres tests in `tests/data` are gated by `describePg` in `tests/support/pg-gate.ts`. Without
    `TEST_PG_URL` they show as skipped, which is not a pass.

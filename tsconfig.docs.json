@@ -1,0 +1,7 @@
+{
+  // What `bun run docs:typedoc` reads: the service's own source, and none of its tests, scripts or
+  // the built web bundle, so TypeDoc documents what the service is made of.
+  "extends": "./tsconfig.json",
+  "include": ["src"],
+  "exclude": ["node_modules", "src/web/dist"]
+}
