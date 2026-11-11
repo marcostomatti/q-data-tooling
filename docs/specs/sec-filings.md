@@ -1,13 +1,15 @@
 # SEC filings service
 
-## Goal
+## What you get
 
 List US companies from the SEC ticker file, fetch each company's last year of filings from EDGAR
 on demand, store them, and link every filing to its original document on sec.gov. A Companies
 page picks which companies to follow, and a Summary page compares them. Documents are linked,
 never downloaded.
 
-## Source of truth
+## Starting position
+
+### Source of truth
 
 - `setup-prompt.md` holds every schema, snippet, link template and edge case. Each task names the
   `setup-prompt.md` section it uses, in quotes.
@@ -16,9 +18,11 @@ never downloaded.
 - `.claude/skills/` holds the scaffolding skills: `/be create-route`, `/db add`, `/db migrate`,
   `/fe empty-page`. Use them instead of writing the scaffolding by hand.
 
-## Current state (2026-11-11)
+### Current state (2026-11-11)
 
-Branch `chore/setup-sec-filings`, cut from `main` after the bootstrap commit `534a7d3`.
+Branch `main`. It holds the bootstrap commit `534a7d3`, the template merge `2f3d64c`, and the
+setup branch `chore/setup-sec-filings`, merged. `bun install` has run, and `bun run typecheck`
+passes.
 
 Done:
 
@@ -27,11 +31,37 @@ Done:
   JSON, ix viewer, raw XML and overflow URLs). The results are in `setup-prompt.md`.
 - **`setup-prompt.md`** is updated for the decisions below and wrapped to the docs width.
 - **Phase 0, steps 1 to 3** (template update, docs checks, README). The template merge is commit
-  `2f3d64c`; the docs checks, ESLint ignores and README are in the commit that adds this spec.
-- **Prompt records.** `schema survey review.md` and `setup-prompt-review.md` hold the two prompts
-  that produced this spec.
+  `2f3d64c`; the docs checks, ESLint ignores and README are in commit `9c25705`. Before planning,
+  the planning-doc checks were pointed at `docs/plans/` and `schema-survey-review.md`, and the
+  width check was set to skip `docs/plans/`.
+- **Prompt records.** `schema-survey-review.md` and `setup-prompt-review.md` hold the two prompts
+  that produced this spec. They are kept as the prompts were written, so they still name
+  `schema survey review.md` and `docs/plan/`.
+- **rafa.** `rafa plan create` writes the plan and its tracker into `docs/plans/` (`plan.dir` in
+  `.rafa/config.yaml`), so both are tracked in git while `.rafa/` stays ignored.
 
-Decisions already taken, so tasks do not reopen them:
+Open:
+
+- Phase 0, step 4 (the README link to the plan).
+- Phases 1 to 7 have not started.
+
+### Prerequisites (the user runs these, no task does)
+
+1. `bun install`, whenever a package is missing. Tasks never install; a task that finds one
+   missing reports it.
+2. `bun run set-password` once. It is interactive: it asks for the password twice and writes
+   `AUTH_MODE=password` and `AUTH_PASSWORD_HASH` into `.env`.
+3. `SEC_USER_AGENT="<app name> <contact email>"` in `.env`, before phase 3's live probe.
+4. `gitleaks` on `PATH` for `bun run privacy`; otherwise the gate runs with `-- --no-gitleaks`.
+
+## Design
+
+The pieces follow the backend map in `CLAUDE.md`: contracts and flows under `src/routes/`,
+entities under `src/entities/`, tables under `src/data/<dialect>/tables/`, repositories under
+`src/data/repositories/`, and pages under `src/web/pages/`. Each phase below names the files it
+adds.
+
+### Decisions already taken, so tasks do not reopen them
 
 - Companies are stored by CIK, with a `company_tickers` table mapping each ticker to its CIK,
   because the ticker file has 10,414 tickers for 8,009 CIKs (`AEM` and `AEMRF` are one company).
@@ -43,24 +73,7 @@ Decisions already taken, so tasks do not reopen them:
 - `GET /companies` takes `q`, because 8,009 companies are paged on the server and the search
   has to run there.
 
-Open:
-
-- **`bun install` has not run**, so the three packages the template merge added
-  (`@asteasolutions/zod-to-openapi`, `swagger-ui-dist`, `typedoc`) are missing. Until it runs,
-  `bun run typecheck` and `bun run lint` fail on `src/http/openapi.ts`, and 12 test files fail to
-  load for the same import. All other tests pass (886), and the docs tests pass in full.
-- Phase 0, step 4 (copy the rafa plan) waits for `rafa plan create`.
-- Phases 1 to 7 have not started.
-
-## Prerequisites (the user runs these, no task does)
-
-1. `bun install`, after phase 0 brings the template's `package.json` in. Tasks never install.
-2. `bun run set-password` once. It is interactive: it asks for the password twice and writes
-   `AUTH_MODE=password` and `AUTH_PASSWORD_HASH` into `.env`.
-3. `SEC_USER_AGENT="<app name> <contact email>"` in `.env`, before phase 3's live probe.
-4. `gitleaks` on `PATH` for `bun run privacy`; otherwise the gate runs with `-- --no-gitleaks`.
-
-## Out of scope
+### Out of scope
 
 - Overflow history files (`filings.files[]`): only the last year is kept.
 - Downloading or caching documents.
@@ -70,7 +83,7 @@ Open:
 - Changes to `NOTES.md`. It is the assessment's hand-written log; no task edits, moves or
   reformats it.
 
-## Rules for every phase
+### Rules for every phase
 
 - Each phase ends with the gates, in order: `bun run lint`, `bun run typecheck`,
   `bun run typecheck:pg`, `bun test`, `bun run privacy`.
@@ -81,8 +94,37 @@ Open:
   reported, not rewritten silently.
 - `NOTES.md` is never staged by a task.
 - Seed and fixture data are copies of public SEC files. They still go through the sweep.
+- Of `.tmp/`, a task reads only the file it names: `.tmp/company_tickers.json` in phase 2 and
+  `.tmp/APPL-CIK0000320193.json` in phase 4. The folder holds gigabytes of SEC files, so no task
+  lists or searches it.
 
-## Phase 0: Project setup
+## What can go wrong
+
+- **SEC refuses the requests.** SEC answers 403 to a request without a declared User-Agent, and
+  429 above 10 requests per second, so a sync gets no data. Control: the service refuses to start
+  without `SEC_USER_AGENT`, the client keeps to 10 requests per second, and the phase 3 tests
+  check that the header is sent and that a 403 answers 502, or serves the stale rows when there
+  are some.
+- **A ticker resolves to the wrong company.** Storing by ticker would split one company with
+  several tickers into several companies. Control: companies are stored by CIK, and the phase 2
+  test resolves `AEM` and `AEMRF` to CIK 2809.
+- **A link template breaks, and every offline test still passes.** The unit tests check the URLs
+  the builder writes, never that sec.gov serves them, so a changed template is a false negative
+  offline. Control: the phase 4 live probe under `SEC_LIVE=1`; a skipped probe reports as
+  skipped, never as passed.
+- **Old filings stay, or fresh ones never arrive.** Control: the phase 3 tests pin the TTL (no
+  SEC call within 24 hours) and the cutoff (rows older than 365 days are deleted on sync).
+- **Private data reaches a commit.** The repository is shared for the assessment, so a leaked
+  path, name or secret is public. Control: the staged-diff sweep before each commit,
+  `bun run privacy` at every gate, and `.githooks/pre-push` over the commits a push sends.
+- **`NOTES.md` is swept into a task commit.** The loop stages the whole tree for each task
+  commit, so a line the user adds to the log while a task runs lands in that commit. Control: the
+  user runs `git update-index --skip-worktree NOTES.md` before the loop and
+  `git update-index --no-skip-worktree NOTES.md` after it.
+
+## Tasks the plan must carry
+
+### Phase 0: Project setup
 
 The template moved on after this project was made, and the docs checks were written for template
 pages, not for planning documents. This phase lines both up before any feature work. Steps 1 to
@@ -97,11 +139,13 @@ it.
 2. **Docs checks for planning documents.** A planning document names files its work has yet to
    create, so:
    - `tests/docs/markdown.ts` exports `isPlanningDoc(file)`: `setup-prompt.md`,
-     `setup-prompt-review.md`, `schema survey review.md`, `docs/specs/**.md`,
-     `docs/plan/**.md`. Tested in `tests/docs/markdown.test.ts`, both ways.
+     `setup-prompt-review.md`, `schema-survey-review.md`, `docs/specs/**.md`,
+     `docs/plans/**.md`. Tested in `tests/docs/markdown.test.ts`, both ways.
    - `tests/docs/paths.test.ts` and `tests/docs/quoted-code.test.ts` skip planning documents.
      The width and link checks still read them.
-   - `tests/docs/width.test.ts` skips `NOTES.md` (a `WIDTH_EXEMPT` set with its reason).
+   - `tests/docs/width.test.ts` skips `NOTES.md` (`WIDTH_EXEMPT`) and `docs/plans/`
+     (`WIDTH_EXEMPT_DIRS`), each with its reason: rafa writes one task per plan line, however
+     long. Tested through `isWidthExempt`, both ways.
    - `eslint.config.mjs` ignores `NOTES.md` and the planning documents, because their fences
      sketch code that does not compile on its own.
 3. **README.** Rewrite `README.md` for this project: what it is; prerequisites; setup and first
@@ -110,15 +154,13 @@ it.
    password is stored (hash only) and recovered (`bun run reset-credentials`, then
    `set-password`); the optional API key (`bun run setApiKey --burn-after-reading`); that the DB
    file is created by `db:migrate`, not by `serve`; the API docs at `/api/docs` and
-   `/api/openapi.json`; the gates; links to this spec, `docs/plan/` and every `docs/*.md` page
-   (the indexes test requires them).
-4. **Plan copy.** Copy `.rafa/plans/PLAN-sec-filings.md` to `docs/plan/sec-filings.md`, so the
-   plan is tracked in git while `.rafa/` stays ignored, and link it from the README's "Read
-   next" list.
-5. Done when: the gates pass, apart from what `bun install` still has to bring (the prerequisite
-   above).
+   `/api/openapi.json`; the gates; links to this spec and every `docs/*.md` page (the indexes
+   test requires them).
+4. **Plan link.** Add `docs/plans/PLAN-sec-filings.md` to the README's "Read next" list. rafa
+   writes the plan there directly, so nothing is copied.
+5. Done when: the gates pass.
 
-## Phase 1: Endpoints and contracts
+### Phase 1: Endpoints and contracts
 
 1. Add `PaginationQuery`, `pageOf`, `Ticker`, `PAGE_SIZE_DEFAULT`, `PAGE_SIZE_MAX` to
    `src/routes/common.ts` ("Shared route schemas"). `Ticker` accepts lower case and returns
@@ -141,7 +183,7 @@ it.
    - Every exported contract and flow has TSDoc, and `bun run docs:typedoc` runs with no
      warnings.
 
-## Phase 2: Database and seed
+### Phase 2: Database and seed
 
 1. `/db add companies`, `/db add company_tickers`, `/db add filings` with the columns and
    indexes in "DB tables", both dialects, one migration each, generated and committed.
@@ -162,7 +204,7 @@ it.
    - The list is alphabetical; the page past the last returns `items: []` with the real total.
    - `PATCH` with `selected: true` twice leaves the company selected (no toggle).
 
-## Phase 3: SEC fetching
+### Phase 3: SEC fetching
 
 1. `SEC_USER_AGENT`: read and validated at startup, and the service refuses to start without
    it. Add it to `.env.example` commented out with a placeholder contact, and to the
@@ -180,18 +222,19 @@ it.
    - Rows older than the cutoff are deleted on sync.
    - The request carries the `SEC_USER_AGENT` value.
 
-## Phase 4: Response and link validation
+### Phase 4: Response and link validation
 
 1. Copy `.tmp/APPL-CIK0000320193.json` to `tests/fixtures/sec/aapl-submissions.json`, and cut a
    5-row fixture from it (10-K, 8-K, Form 4, 424B2, UPLOAD).
 2. Contract test ("DoD verification"): the 1001 rows parse with 0 failures; with
-   `now = 2026-11-11`, the last-year cut keeps 94 rows: 1 × 10-K, 3 × 10-Q, 9 × 8-K.
+   `now = 2026-11-11`, the last-year cut keeps 94 rows of every form, and 13 of them are the
+   three tracked forms: 1 × 10-K, 3 × 10-Q, 9 × 8-K.
 3. Unit tests for every case in "Edge cases for test suite".
 4. Live probe, off unless `SEC_LIVE=1`: `HEAD` the document, index and ix viewer links built for
    Apple's 10-K `0000320193-26-000026`, and expect 200 for each. A skipped probe reports as
    skipped, not as passed.
 
-## Phase 5: Companies page
+### Phase 5: Companies page
 
 1. `/fe empty-page companies`.
 2. `Toolbar` with search (`q`, debounced) and a selected-only filter, plus pagination controls.
@@ -202,7 +245,7 @@ it.
 4. Render tests: rows render from the API stub; the switch sends the PATCH with an explicit
    boolean; an API error shows a message, not an empty list.
 
-## Phase 6: Filings view
+### Phase 6: Filings view
 
 1. A `Drawer` (option B) and a full-screen `Modal` (option A), behind one toggle, both fed by
    `GET /companies/:ticker/filings`.
@@ -214,7 +257,7 @@ it.
 5. Render tests: groups match the three forms; links carry the built URLs; a company with no
    10-K shows no latest card.
 
-## Phase 7: Summary page
+### Phase 7: Summary page
 
 1. `/fe empty-page summary`.
 2. Three compact `SmallStatCard`: total filings of the selected companies, average per company,
@@ -225,9 +268,17 @@ it.
 5. Render tests: the table lists the selected companies; Remove asks first and then sends the
    PATCH; an empty selection shows a pointer to the Companies page.
 
-## Done when
+## Definition of done
 
-- Every phase's gates pass.
-- On a fresh clone, the prerequisites plus the README's setup steps start the service with the
-  seeded companies, and selecting Apple shows its last year of filings with working links.
-- No commit holds private data (the sweep in "Rules for every phase").
+- At the end of every phase, `bun run lint`, `bun run typecheck`, `bun run typecheck:pg`,
+  `bun test` and `bun run privacy` pass, in that order.
+- On a fresh `bun run db:migrate`, `bun run db:seed` run twice leaves 8,009 companies and 10,414
+  tickers.
+- `bun test` runs the phase 4 contract test green: 1001 rows parse with 0 failures, and the
+  last-year cut keeps 94 rows, 13 of them in the three tracked forms.
+- `SEC_LIVE=1 bun test` runs the phase 4 live probe, and the document, index and ix viewer links
+  of Apple's 10-K `0000320193-26-000026` answer 200.
+- After the README's setup steps on a fresh clone, `PATCH /companies/AAPL` with
+  `selected: true`, called with an API key, answers, and `GET /companies/AAPL/filings` then
+  lists Apple's last year of filings, each with a `links.document` on sec.gov.
+- `bash scripts/privacy-history.sh origin/main..HEAD` exits 0 on the branch.
