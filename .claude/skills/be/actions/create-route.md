@@ -99,14 +99,22 @@ A multi-statement write goes through `transact(db, body)` from `src/data/active.
 - SQLite does not enforce foreign keys; see Known limitations below for a sub path's checks.
 
 **Route:** `src/routes/<plural>/http.ts` builds one spec per method with `route()`, which takes
-the tool's name and the tool's input schema object. `src/routes/info/http.ts` is the example:
+the tool's name, the tool's input schema object, and the route's description: a one-line
+`summary` and the contract's `output` schema, the `data` a success answers. The OpenAPI
+document at `GET /api/openapi.json` reads all of it, and a route without a description fails
+typecheck. `src/routes/info/http.ts` is the example:
 
 ```ts
 // src/routes/info/http.ts
-export const infoRoute = route('get', '/info', 'service_info', InfoInputSchema,
-  async (input, { log }) =>
-    getServiceInfo(input, { env: process.env, dialect: DIALECT, log: inDomain(log, DOMAIN) }))
+export const infoRoute = route('get', '/info', 'service_info', InfoInputSchema, {
+  summary: 'The service id, name and version, its database dialect, and whether ...',
+  output: ServiceInfoSchema,
+}, async (input, { log }) =>
+  getServiceInfo(input, { env: process.env, dialect: DIALECT, log: inDomain(log, DOMAIN) }))
 ```
+
+A `list` route's output is the array, such as `z.array(WidgetSchema)`, and a `delete` route's is
+what its flow returns.
 
 `run` receives one context as its second argument, `{ db, log, pathOnly }`: the database, which
 `info` never reads, the request's log, on which the route binds the `DOMAIN` its contract
@@ -114,15 +122,18 @@ exports, and the `options.pathOnly` values. A route over a table builds its stor
 
 ```ts
 // src/routes/<plural>/http.ts
-route('get', '/widgets/:widgetId', 'widget_get', WidgetGetInputSchema, async (input, { db }) =>
-  getWidget(input, { store: widgetStore(db) })),
+route('get', '/widgets/:widgetId', 'widget_get', WidgetGetInputSchema, {
+  summary: 'Reads one widget.',
+  output: WidgetSchema,
+}, async (input, { db }) => getWidget(input, { store: widgetStore(db) })),
 ```
 
 A path parameter is named after a field of that schema, so `/widgets/:widgetId` needs a
 `widgetId` field, and `:id` is refused. A path that names a parameter its schema does not
 name passes it as `options.pathOnly`, which `src/http/handler.ts` describes. A route with no
-tool uses `webRoute()` from `src/http/route.ts` instead. Export the resource's specs as one
-array, such as `widgetRoutes`, and spread it into `ROUTES` in `src/routes/http.ts`
+tool uses `webRoute()` from `src/http/route.ts` instead, with the same description. Export the
+resource's specs as one array, such as `widgetRoutes`, and spread it into `ROUTES` in
+`src/routes/http.ts`
 (`[infoRoute, ...widgetRoutes]`). A sub path's array is spread there too, beside its parent's.
 
 **Tool:** `src/routes/<plural>/tool.ts` builds one tool per route with `defineTool`, using the
@@ -164,7 +175,10 @@ the call's data go in that line's context object, never in a binding:
 
 ```ts
 // src/routes/<plural>/http.ts
-route('post', '/widgets', 'widget_create', WidgetCreateInputSchema, async (input, { db, log }) =>
+route('post', '/widgets', 'widget_create', WidgetCreateInputSchema, {
+  summary: 'Creates one widget.',
+  output: WidgetSchema,
+}, async (input, { db, log }) =>
   createWidget(input, { store: widgetStore(db), log: inDomain(log, DOMAIN) }))
 
 // src/routes/<plural>/create.flow.ts
@@ -189,6 +203,12 @@ The level rule: a routine step logs at `debug` or `trace`, and most steps are ro
 key step on the use case's critical path logs at `info`, and a flow has few. A step that went
 wrong logs at `warn` or `error` with the failure's code, never its secret detail. A flow never
 logs an input body, a token or a password.
+
+**Documentation:** every exported symbol in the files above gets a TSDoc block, `/** ... */`
+before it, saying what it holds or does in this resource. A function's block names its
+parameters with `@param name - text`, its result with `@returns`, and each error it throws with
+`@throws {NotFoundError}` and the condition. `bun run docs:typedoc` renders the blocks into
+`.docs/typedoc/`, and `docs/documentation.md` holds the rest of the rules.
 
 ## Tests
 
@@ -225,6 +245,9 @@ Put every test under `tests/routes/<plural>/`, following the three test files in
 - **Tool:** a tool test through `connectTools` from `tests/support/tool-harness.ts`.
 - **Route table:** `tests/http/routes.test.ts` probes every route in `ROUTES` with a stray key and
   expects a 400, so a route whose schema is not strict fails it.
+- **API docs:** `tests/http/openapi.test.ts` checks that every route in `ROUTES` is one operation
+  of the OpenAPI document, so a new route is covered once it is listed. Its input must be an
+  object schema, or the document refuses it, naming the route.
 - **All tools:** `tests/mcp/all-tools.test.ts` imports `ALL_TOOLS`, so it checks each new tool
   once it is listed. Its test "holds only service_info while OPEN_NOTEBOOK_URL is unset" pins the
   exact list, and it fails the moment a tool is added. Add the new tool names to that

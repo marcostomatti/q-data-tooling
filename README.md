@@ -35,5 +35,10 @@ you need them.
 - [MCP](docs/mcp.md): the service's tools for an agent, over stdio or HTTP.
 - [Open Notebook](docs/open-notebook.md): a notes store that runs beside the service.
 - [Web](docs/web.md): the web app, its pages and how to build it.
+- [Documentation](docs/documentation.md): the API docs at `/api/docs`, read from the routes, and
+  the TSDoc rules TypeDoc renders.
+- [rafa](docs/rafa.md): the open-tomato command line for issues, pull requests and CI.
+- [Template updates](docs/template-updates.md): bringing the template's latest `main` into a
+  project made from it.
 
 For the layout and the rules that agents and reviewers follow, see [CLAUDE.md](CLAUDE.md).

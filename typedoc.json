@@ -1,0 +1,12 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "template-service",
+  "entryPointStrategy": "expand",
+  "entryPoints": ["src"],
+  "exclude": ["src/web/dist/**"],
+  "out": ".docs/typedoc",
+  "tsconfig": "tsconfig.docs.json",
+  "readme": "README.md",
+  "excludePrivate": true,
+  "excludeInternal": true
+}

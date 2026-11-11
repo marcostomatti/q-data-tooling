@@ -14,10 +14,12 @@
     "drizzle-kit": "^0.31.11",
     "eslint": "^9.39.5",
     "tailwindcss": "^4.3.5",
+    "typedoc": "^0.28.20",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.72.2"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^9.1.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@open-tomato/components": "0.1.1",
     "@open-tomato/service": "^2.0.0",
@@ -30,6 +32,7 @@
     "postgres": "^4.1.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "swagger-ui-dist": "^5.34.1",
     "zod": "^4.6.7"
   },
   "scripts": {
@@ -46,6 +49,9 @@
     "set-password": "bun src/auth/set-password.ts",
     "reset-credentials": "bun src/auth/reset-credentials.ts",
     "build:web": "bun scripts/build-web.ts",
+    "docs:generate": "bun run docs:typedoc && bun run docs:openapi",
+    "docs:typedoc": "typedoc",
+    "docs:openapi": "bun scripts/export-openapi.ts",
     "typecheck": "tsc --noEmit -p .",
     "typecheck:pg": "tsc --noEmit -p tsconfig.pg.json",
     "test:integration": "bun test tests/integration tests/contract",

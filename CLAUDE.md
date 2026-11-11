@@ -21,6 +21,13 @@ path below is a real file in the tree; the web app under `src/web/` is not cover
   generated files with the schema change. `service_info` has none.
 - MCP tool: `src/routes/<name>/tool.ts` defines one tool with `defineTool`, and `ALL_TOOLS` in
   `src/routes/tools.ts` lists it. `service_info` is `src/routes/info/tool.ts`.
+- API docs: `route()` takes a description after the tool's schema, its `summary` and the
+  contract's `output` schema, and `webRoute()` takes it after its schema. `buildOpenApiDocument`
+  in `src/http/openapi.ts` reads `ROUTES` into the OpenAPI document served at
+  `GET /api/openapi.json` and `GET /api/docs`. `service_info` is described in
+  `src/routes/info/http.ts`. `docs/documentation.md` holds the rules.
+- TSDoc: every exported symbol gets a `/** ... */` block, with `@param`, `@returns` and `@throws`
+  on a function. `bun run docs:generate` renders it with TypeDoc into `.docs/`.
 - Integration test: `tests/integration/auth-flow.test.ts` is the only integration test, because
   sign-in is the only place the web app and the backend meet; `bun run test:integration` runs it
   with `tests/contract/`.
@@ -59,3 +66,23 @@ only the action file it names. Of the `/fe` actions only `empty-page` is built, 
 - `/db update <table>`: creates a column or constraint the stored rows need, as three migrations:
   add it loose, backfill it, then tighten it.
 - `/db migrate`: creates the pending migration for the active dialect, shows its SQL and applies it.
+
+## Template updates
+
+A project made from this template brings in the template's later changes by merging its `main`:
+`docs/template-updates.md` has the steps, from adding the `template` remote to the gates after.
+Resolving a conflict between the two is the project's own call.
+
+## Additional tooling
+
+We use the `@open-tomato/rafa` CLI for issues, pull requests, CI and the other workflow tasks;
+`docs/rafa.md` sets it up. Run `rafa describe --output=json` the first time, to learn its
+commands and what they do. When it is the intended next step in the workflow, prefer the command
+suggested at the end of a rafa action's output over a self-written command that does the same.
+Treat rafa's effort store, learnings and skills for work done in this project as the preferred
+memory source of truth.
+
+### Additional contexts
+
+Use `rafa skill <action>` and `rafa agent <action>` to list and enable the skills and agents the
+project needs. Do it once, then only on request, because the lists are long to read every session.

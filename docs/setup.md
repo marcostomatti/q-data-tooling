@@ -173,6 +173,9 @@ Every script in `package.json`, in the order the file lists them. Run one with `
 | `set-password` | `bun src/auth/set-password.ts` | Asks for the password twice and writes its hash to `AUTH_PASSWORD_HASH` in `.env`. |
 | `reset-credentials` | `bun src/auth/reset-credentials.ts` | Signs out every browser, deletes every API token and removes `AUTH_PASSWORD_HASH`. |
 | `build:web` | `bun scripts/build-web.ts` | Builds the web app into `src/web/dist/`. |
+| `docs:generate` | `bun run docs:typedoc && bun run docs:openapi` | Builds both docs into `.docs/` (see [Documentation](documentation.md)). |
+| `docs:typedoc` | `typedoc` | Renders the TSDoc blocks of `src/` into `.docs/typedoc/`. |
+| `docs:openapi` | `bun scripts/export-openapi.ts` | Writes the OpenAPI document the service serves to `.docs/openapi.json`. |
 | `typecheck` | `tsc --noEmit -p .` | Type-checks the active dialect. |
 | `typecheck:pg` | `tsc --noEmit -p tsconfig.pg.json` | Type-checks the Postgres dialect, whichever one is active. |
 | `test:integration` | `bun test tests/integration tests/contract` | Runs the integration and contract tests. |
