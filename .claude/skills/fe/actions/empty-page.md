@@ -78,6 +78,12 @@ all.
 The web app does not log to the server logger. The page imports nothing from `src/logging.ts`, so
 it binds no domain or scope and writes no log line, and its test needs no capturing log.
 
+## Documentation
+
+The page's exported view and its entry each get a TSDoc block, `/** ... */` before them, saying
+what the page shows. `docs/documentation.md` holds the rules, and `bun run docs:typedoc` renders
+them.
+
 ## Verify
 
 Run `bun run typecheck && bun run lint && bun test tests/web tests/http/server.test.ts`. All of

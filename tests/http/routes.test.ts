@@ -69,7 +69,7 @@ describe('the route table', () => {
 
 describe('the delete method', () => {
   test('a webRoute on delete answers a DELETE, and a GET on the same path is a 404', async () => {
-    const removed = webRoute('delete', '/probe-items/:itemId', z.strictObject({ itemId: z.string() }), async (args) => ({ removed: args.itemId }));
+    const removed = webRoute('delete', '/probe-items/:itemId', z.strictObject({ itemId: z.string() }), { summary: 'Removes a probe item.', output: z.strictObject({ removed: z.string() }) }, async (args) => ({ removed: args.itemId }));
     // Mounted the way mountRoutes mounts each spec, by indexing the router with the spec's method.
     const server = await startTestServer((app) => {
       const api = Router();
