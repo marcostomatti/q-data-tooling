@@ -103,7 +103,7 @@ default. Run every step for both dialects, whichever is active.
 
 7. **Offer a seed file.** Ask whether the table needs starting rows. If it does, write
    `src/data/seeds/<NN>-<name>.ts` as `.claude/skills/db/reference/data-changes.md` describes.
-   If it does not, say so: the template ships no seeds.
+   If it does not, say so.
 
 8. **Document it.** Give each table and each column whose name does not say it all a TSDoc block,
    `/** ... */` before it, in both dialects' files. `docs/documentation.md` holds the rules.

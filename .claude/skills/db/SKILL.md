@@ -38,4 +38,4 @@ A migration that did not run, or a file that changed after it ran, is recovered 
 - `bun run db:migrate` applies the active dialect's migrations to the database `DATABASE_URL`
   names.
 - `bun run db:seed` runs the seed files named `src/data/seeds/<NN>-<name>.ts`, in file-name
-  order. The template ships none.
+  order. The template ships none; this service ships `01-companies.ts`, the SEC ticker list.

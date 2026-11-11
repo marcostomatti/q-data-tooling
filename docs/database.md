@@ -93,11 +93,12 @@ hold after it. Run `bun test tests/data/journal.test.ts` before any migrate, and
 ### Seeds
 
 `bun run db:seed` runs the seed files in the `seeds` folder under `src/data/`, in file-name
-order. The template ships no seed files, and a missing folder means zero seeds, so the command
-logs `no seeds ran` and exits 0. A seed file is named `<NN>-<name>.ts`, with two digits, a dash
-and a lower-case kebab name. A file with any other name stops the run before any seed runs. Each
-seed runs in its own transaction, so a seed that throws leaves none of its own writes behind, and
-the run stops and names the file.
+order. The template ships no seed files; this service ships `01-companies.ts`, which loads the
+SEC ticker list into `companies` and `company_tickers`. A missing folder means zero seeds, so
+the command logs `no seeds ran` and exits 0. A seed file is named `<NN>-<name>.ts`, with two
+digits, a dash and a lower-case kebab name. A file with any other name stops the run before any
+seed runs. Each seed runs in its own transaction, so a seed that throws leaves none of its own
+writes behind, and the run stops and names the file.
 
 The runner records nothing, so every run runs every seed again. A seed must therefore insert
 on its natural key with `onConflictDoNothing()`. A seed imports `appConfig` from

@@ -165,7 +165,7 @@ Every script in `package.json`, in the order the file lists them. Run one with `
 | `db:generate` | `drizzle-kit generate` | Writes the migration for the active dialect's schema into `drizzle/<dialect>/`. |
 | `db:migrate` | `bun src/data/migrate.ts` | Applies the active dialect's pending migrations to `DATABASE_URL`. |
 | `db:status` | `bun src/data/migration-status.ts` | Compares the migration files with the journal rows. Exits 1 on a skipped or unknown one. |
-| `db:seed` | `bun src/data/seed.ts` | Runs the seed files in name order, one transaction each. The template ships none. |
+| `db:seed` | `bun src/data/seed.ts` | Runs the seed files in name order, one transaction each. `01-companies.ts` loads the SEC ticker list. |
 | `setApiKey` | `bun src/auth/set-api-key.ts` | Generates `API_KEY`. With `--burn-after-reading`, saves it to `.env` and shows it once. |
 | `mcp` | `bun src/mcp/server.ts` | Starts the MCP server: stdio by default, HTTP when `MCP_TRANSPORT=http`. |
 | `serve` | `bun src/http/server.ts` | Starts the HTTP service on `PORT`, default 3000, with the web app when it is built. |
