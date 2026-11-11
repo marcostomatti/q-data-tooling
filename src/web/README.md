@@ -21,6 +21,9 @@ split: `FilingsView` is pure, and `FilingsDialog` holds the state and the
 fetching. The library's `Drawer` and `Modal` render nothing without a DOM, so
 the tests render the pure `FilingsPanel` inside them and read which overlay the
 view returns by calling it.
+In the drawer the panel lists the filings in the library's `Accordion`, one
+group per tracked form. A closed group renders no children, so a test that reads
+a group's links opens it with `defaultOpen`.
 
 ## Adding a page to `PAGES`
 

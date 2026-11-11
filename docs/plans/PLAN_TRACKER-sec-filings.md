@@ -237,11 +237,13 @@ header. Groups are the three tracked forms. `TreeNav` replaces `Accordion` only 
 cannot hold the links.
 ```
 
-- [ ] Add the filings view `src/web/components/filings-view.tsx`: a `Drawer` (option B) and a full-screen `Modal` (option A) behind one toggle, fed by `GET /companies/:ticker/filings`, topped by an `EntityCard` titled `Latest: 10-K <date>` opening `links.document` and shown only when a 10-K exists  {agent=loop-implementer effort=high}
+- [x] Add the filings view `src/web/components/filings-view.tsx`: a `Drawer` (option B) and a full-screen `Modal` (option A) behind one toggle, fed by `GET /companies/:ticker/filings`, topped by an `EntityCard` titled `Latest: 10-K <date>` opening `links.document` and shown only when a 10-K exists  {agent=loop-implementer effort=high}
   - Note: `FilingsView` (pure) picks `Drawer` size `lg` or a full-screen `Modal` by `layout`; `FilingsDialog` holds the layout and the load, and the wiring task renders it with `ticker` set (unset keeps it closed).
   - Note: `FilingsPanel` holds a slot-free body: the drawer and modal body tasks add their listing after the latest card. `loadFilings` pages `GET /api/companies/:ticker/filings` at 100 a page, at most 10 pages.
   - Note: the full-screen modal passes one class string (`Modal` sizes stop at `lg`, 620px), against the web README's variants-only rule.
 - [ ] Add the filings view drawer body: an `Accordion` with one group per tracked form, each child showing the filing date and `primaryDocument`, linking to `links.document` and adding the ix viewer link when present  {agent=loop-implementer effort=medium}
+  - Note: `FilingsAccordion` (mode `multiple`, first form open by default) renders in `FilingsPanel` for `layout === 'drawer'` once there are filings; `groupByForm` gives one group per `TRACKED_FORMS` entry, a web-side copy of `TrackedForm` (type-only import keeps zod out of the bundle; a test holds them equal).
+  - Note: links are real `<a target="_blank" rel="noopener noreferrer">` under a ghost `Button asChild`, so render tests read the built sec.gov URLs from `href`; `Accordion` held them, so no `TreeNav`.
 - [ ] Add the filings view modal body: a 3-column grid with one `SectionCard` per tracked form listing its filings and links  {agent=loop-implementer effort=medium}
 - [ ] Wire the Companies page `onOpenFilings` to open the filings view for the chosen ticker  {agent=loop-implementer effort=low}
 - [ ] Add render tests showing a company with no 10-K shows no latest card, the groups match the three forms, and the links carry the built sec.gov URLs  {agent=tdd-guide effort=medium tests=module}

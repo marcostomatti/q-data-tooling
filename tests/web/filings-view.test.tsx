@@ -7,6 +7,7 @@ import { describe, expect, test } from 'bun:test';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
+import { TrackedForm } from '../../src/entities/filing.ts';
 import { createFilingsClient, filingsPath } from '../../src/web/api.ts';
 import {
   DEFAULT_LAYOUT,
@@ -14,13 +15,19 @@ import {
   FILINGS_LOADING,
   FILINGS_MAX_PAGES,
   FILINGS_PAGE_SIZE,
+  FilingRow,
+  FilingsAccordion,
   FilingsLayoutToggle,
   FilingsPanel,
   FilingsView,
+  groupByForm,
+  IX_VIEWER_LABEL,
   LatestTenKCard,
   latestTenKOf,
   latestTitleOf,
   loadFilings,
+  noFilingsOf,
+  TRACKED_FORMS,
 } from '../../src/web/components/filings-view.tsx';
 
 const ARCHIVES = 'https://www.sec.gov/Archives/edgar/data/320193';
@@ -277,5 +284,88 @@ describe('FilingsView', () => {
       expect(html).toContain('Latest: 10-K 2025-10-31');
       expect(html).toContain('role="tablist"');
     }
+  });
+});
+
+describe('groupByForm', () => {
+  test('the view\'s forms are the tracked forms, in their order', () => {
+    expect(TRACKED_FORMS).toEqual(TrackedForm.options);
+  });
+
+  test('one group per tracked form, amendments under their form, order kept', () => {
+    const amended = filingOf('10-K/A', '2025-12-01', '0000320193-25-000099');
+    const groups = groupByForm([EIGHT_K, amended, TEN_Q, TEN_K]);
+    expect(groups.map((group) => group.form)).toEqual(['10-K', '10-Q', '8-K']);
+    expect(groups[0]?.filings).toEqual([amended, TEN_K]);
+    expect(groups[1]?.filings).toEqual([TEN_Q]);
+    expect(groups[2]?.filings).toEqual([EIGHT_K]);
+  });
+
+  test('a form not filed is an empty group, an untracked form is left out', () => {
+    const groups = groupByForm([filingOf('S-1', '2026-01-02', '0000320193-26-000001'), TEN_Q]);
+    expect(groups.map((group) => group.filings.length)).toEqual([0, 1, 0]);
+  });
+});
+
+describe('FilingRow', () => {
+  test('shows the date and links the primary document to links.document', () => {
+    const html = renderToStaticMarkup(<FilingRow filing={TEN_K} />);
+    expect(html).toContain('2025-10-31');
+    expect(html).toContain(`href="${ARCHIVES}/000032019325000079/aapl-20251031.htm"`);
+    expect(html).toContain(`>${TEN_K.primaryDocument}</a>`);
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener noreferrer"');
+  });
+
+  test('adds the ix viewer link when the filing has one', () => {
+    const html = renderToStaticMarkup(<FilingRow filing={TEN_K} />);
+    expect(html).toContain('href="https://www.sec.gov/ix?doc=/Archives/edgar/data/320193/000032019325000079/aapl-20251031.htm"');
+    expect(html).toContain(`>${IX_VIEWER_LABEL}</a>`);
+  });
+
+  test('shows no ix viewer link without inline XBRL', () => {
+    const plain: typeof TEN_K = { ...TEN_K, isInlineXbrl: false, links: { ...TEN_K.links, inlineXbrlViewer: null } };
+    const html = renderToStaticMarkup(<FilingRow filing={plain} />);
+    expect(html).not.toContain(IX_VIEWER_LABEL);
+    expect(html).not.toContain('/ix?doc=');
+    expect(html.match(/<a /g)).toHaveLength(1);
+  });
+
+  test('names the form as filed for an amendment only', () => {
+    const amended = filingOf('10-K/A', '2025-12-01', '0000320193-25-000099');
+    expect(renderToStaticMarkup(<FilingRow filing={amended} />)).toContain('10-K/A');
+    expect(renderToStaticMarkup(<FilingRow filing={TEN_K} />)).not.toContain('10-K');
+  });
+});
+
+describe('FilingsAccordion', () => {
+  test('titles one group per tracked form with its count', () => {
+    const html = renderToStaticMarkup(<FilingsAccordion filings={[EIGHT_K, TEN_Q, TEN_K, OLDER_TEN_K]} />);
+    expect(html).toContain('10-K (2)');
+    expect(html).toContain('10-Q (1)');
+    expect(html).toContain('8-K (1)');
+  });
+
+  test('opens the first form\'s group by default, its filings linked', () => {
+    const html = renderToStaticMarkup(<FilingsAccordion filings={WITH_TEN_K.filings} />);
+    expect(html).toContain(`href="${TEN_K.links.document}"`);
+    expect(html).not.toContain(`href="${TEN_Q.links.document}"`);
+  });
+
+  test('open groups list every filing, and an empty form says so', () => {
+    const html = renderToStaticMarkup(<FilingsAccordion filings={WITHOUT_TEN_K.filings} defaultOpen={TRACKED_FORMS} />);
+    expect(html).toContain(noFilingsOf('10-K'));
+    expect(html).toContain(`href="${TEN_Q.links.document}"`);
+    expect(html).toContain(`href="${EIGHT_K.links.document}"`);
+  });
+
+  test('the drawer panel holds the accordion, the modal panel does not', () => {
+    expect(renderToStaticMarkup(<FilingsPanel layout="drawer" result={WITH_TEN_K} />)).toContain('10-Q (1)');
+    expect(renderToStaticMarkup(<FilingsPanel layout="modal" result={WITH_TEN_K} />)).not.toContain('10-Q (1)');
+  });
+
+  test('the drawer panel shows no accordion before the answer or with no filings', () => {
+    expect(renderToStaticMarkup(<FilingsPanel layout="drawer" />)).not.toContain('10-Q (');
+    expect(renderToStaticMarkup(<FilingsPanel layout="drawer" result={{ company: COMPANY, filings: [] }} />)).not.toContain('10-Q (');
   });
 });

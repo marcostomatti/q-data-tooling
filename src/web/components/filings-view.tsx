@@ -1,12 +1,23 @@
+import type { TrackedForm } from '../../entities/filing.ts';
 import type { SelectionItem } from '@open-tomato/components';
 
-import { Banner, Content, Drawer, EmptyState, EntityCard, Modal, Segmented } from '@open-tomato/components';
+import { Accordion, AccordionItem, Banner, Button, Content, Drawer, EmptyState, EntityCard, Modal, Segmented } from '@open-tomato/components';
 import { useEffect, useState } from 'react';
 
 import { filings, type Filing, type FilingPage } from '../api.ts';
 
 /** The base form the latest card is drawn for. */
 export const LATEST_FORM = '10-K';
+
+/**
+ * The base forms the view groups filings under, in the order the groups show. It mirrors
+ * `TrackedForm` in `src/entities/filing.ts`, which is imported as a type only so the bundle does
+ * not carry zod; a test holds the two equal.
+ */
+export const TRACKED_FORMS: readonly TrackedForm[] = ['10-K', '10-Q', '8-K'];
+
+/** The label of a filing's inline XBRL viewer link. */
+export const IX_VIEWER_LABEL = 'ix viewer';
 
 /** The most filings one request asks for, the route's own largest page size. */
 export const FILINGS_PAGE_SIZE = 100;
@@ -155,6 +166,112 @@ export function LatestTenKCard({ filing, onOpenLink }: LatestTenKCardProps) {
   );
 }
 
+/** The filings of one tracked form, newest first. */
+export interface FormGroup {
+  /** The base form, amendments counted under it. */
+  readonly form: TrackedForm
+  /** The form's filings, in the order the list held them. */
+  readonly filings: readonly Filing[]
+}
+
+/**
+ * Groups filings by base form, one group per entry of {@link TRACKED_FORMS} in its order, each
+ * keeping the order the list held, so a newest-first list gives newest-first groups. A form the
+ * company did not file is a group with no filings; a filing of an untracked form is left out.
+ *
+ * @param list - The company's filings.
+ * @returns One group per tracked form.
+ */
+export function groupByForm(list: readonly Filing[]): readonly FormGroup[] {
+  return TRACKED_FORMS.map((form) => ({
+    form,
+    filings: list.filter((filing) => filing.baseForm === form),
+  }));
+}
+
+/**
+ * What a form's group says when the company filed none of it in the last year.
+ *
+ * @param form - The base form.
+ * @returns The line, such as `No 10-Q filings in the last year`.
+ */
+export function noFilingsOf(form: TrackedForm): string {
+  return `No ${form} filings in the last year`;
+}
+
+/**
+ * A sec.gov link opening in a new tab with no `window.opener` handed to it, drawn as the
+ * library's small `ghost` `Button` over the anchor.
+ */
+function SecLink({ href, children }: { readonly href: string, readonly children: string }) {
+  return (
+    <Button asChild variant="ghost" size="sm">
+      <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
+    </Button>
+  );
+}
+
+/** The props of {@link FilingRow}. */
+export interface FilingRowProps {
+  /** The filing shown. */
+  readonly filing: Filing
+}
+
+/**
+ * One filing in its form's group: its filing date, its `primaryDocument` as the title linking to
+ * `links.document`, the form as filed when it is an amendment, and the inline XBRL viewer link
+ * when the filing has one.
+ *
+ * @param props - The filing, as {@link FilingRowProps} lists it.
+ * @returns The row.
+ */
+export function FilingRow({ filing }: FilingRowProps) {
+  return (
+    <Content direction="row" align="center" gap="sm">
+      <span className="text-sm text-fg3">{filing.filingDate}</span>
+      <SecLink href={filing.links.document}>{filing.primaryDocument}</SecLink>
+      {filing.isAmendment && <span className="text-sm text-fg3">{filing.form}</span>}
+      {filing.links.inlineXbrlViewer !== null && (
+        <SecLink href={filing.links.inlineXbrlViewer}>{IX_VIEWER_LABEL}</SecLink>
+      )}
+    </Content>
+  );
+}
+
+/** The props of {@link FilingsAccordion}. */
+export interface FilingsAccordionProps {
+  /** The company's filings, newest first. */
+  readonly filings: readonly Filing[]
+  /** The forms whose groups start open; the first tracked form by default. */
+  readonly defaultOpen?: readonly TrackedForm[]
+}
+
+/**
+ * The drawer's body (option B, variant 1): the library's `Accordion`, one item per tracked form
+ * titled with the form and its count, holding a {@link FilingRow} per filing, or
+ * {@link noFilingsOf} when the form has none. Many groups can be open at once.
+ *
+ * @param props - The filings and the groups open at first, as {@link FilingsAccordionProps} lists them.
+ * @returns The accordion.
+ */
+export function FilingsAccordion({ filings: list, defaultOpen = TRACKED_FORMS.slice(0, 1) }: FilingsAccordionProps) {
+  return (
+    <Accordion mode="multiple" defaultValue={[...defaultOpen]}>
+      {groupByForm(list).map(({ form, filings: group }) => (
+        <AccordionItem key={form} value={form} title={`${form} (${group.length})`}>
+          {group.length === 0
+            ? <p className="m-0 text-sm text-fg3">{noFilingsOf(form)}</p>
+            : (
+              <Content gap="sm">
+                {group.map((filing) => <FilingRow key={filing.accessionNumber} filing={filing} />)}
+              </Content>
+            )}
+        </AccordionItem>
+      ))}
+    </Accordion>
+  );
+}
+
 /** The props of {@link FilingsLayoutToggle}. */
 export interface FilingsLayoutToggleProps {
   /** The layout shown. */
@@ -198,8 +315,9 @@ export interface FilingsPanelProps extends FilingsLayoutToggleProps {
 /**
  * What the drawer and the modal both hold: the layout toggle in a header row, an alert when the
  * load failed, a loading line before the answer, the {@link LatestTenKCard} only when the company
- * filed a 10-K, and the library's `EmptyState` when it filed none of the tracked forms. Pure: it
- * holds no state and calls no API.
+ * filed a 10-K, and the library's `EmptyState` when it filed none of the tracked forms. In the
+ * drawer layout the {@link FilingsAccordion} follows, once there are filings. Pure: it holds no
+ * state and calls no API.
  *
  * @param props - The panel's values and handlers, as {@link FilingsPanelProps} lists them.
  * @returns The panel.
@@ -219,6 +337,9 @@ export function FilingsPanel({ layout, onLayoutChange, result, error, onOpenLink
       {error === undefined && result === undefined && <p className="m-0">{FILINGS_LOADING}</p>}
       {latest !== undefined && <LatestTenKCard filing={latest} onOpenLink={onOpenLink} />}
       {result?.filings.length === 0 && <EmptyState title={FILINGS_EMPTY_TITLE} />}
+      {layout === 'drawer' && result !== undefined && result.filings.length > 0 && (
+        <FilingsAccordion filings={result.filings} />
+      )}
     </Content>
   );
 }
