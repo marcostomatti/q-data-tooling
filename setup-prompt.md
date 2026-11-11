@@ -247,7 +247,7 @@ const FilingColumns = z.object({
   size: z.array(z.number()),   // bytes
   isXBRL: z.array(z.number()),   // 0 | 1
   isInlineXBRL: z.array(z.number()),   // 0 | 1
-  isXBRLNumeric: z.array(z.number()),   // 0 | 1
+  isXBRLNumeric: z.array(z.number().nullable()),   // 0 | 1 | null (an UPLOAD row)
   primaryDocument: z.array(z.string()),   // "aapl-20260926.htm" | "xslF345X06/form4.xml"
   primaryDocDescription: z.array(z.string()),   // often ""
 });

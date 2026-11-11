@@ -53,6 +53,7 @@ export const Address = z.object({
 /**
  * The filings as EDGAR sends them: one array per field, every array the same length, index `i`
  * of each describing the same filing. `filings.recent` and every overflow file share it.
+ * `isXBRLNumeric` is `null` on some rows, such as an UPLOAD; the parsers drop it.
  */
 export const FilingColumns = z.object({
   accessionNumber: z.array(z.string()),
@@ -68,7 +69,7 @@ export const FilingColumns = z.object({
   size: z.array(z.number()),
   isXBRL: z.array(z.number()),
   isInlineXBRL: z.array(z.number()),
-  isXBRLNumeric: z.array(z.number()),
+  isXBRLNumeric: z.array(z.number().nullable()),
   primaryDocument: z.array(z.string()),
   primaryDocDescription: z.array(z.string()),
 });
