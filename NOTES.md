@@ -59,6 +59,18 @@ check [10:35]. Done with planning and bootstrapping, starting with some surveyin
       },
     ```
   - company archive  https://www.sec.gov/Archives/edgar/data/1045810/000104581026000024/ => xml(`FilingSummary.MyReports.InputFiles[doctype='8-K']` = `nvda-20260302.htm`)
-Check [11.37]. -- done reviewing data structures and api. First query trials
+Check [11.37]. -- done reviewing data structures and api and first query trials
 [!note] `@open-tomato/ui` was using our local private registry, ensure the last published version is updated in https://registry.npmjs.org/ after the credentials rotation. 
-
+Check [~15.00] -- resuming work reviewing previous findings. Now building spec -> plan -> `rafa loop start`
+- Findings:
+  - Ticker to CIK matching fail on seconday checks as some companies have multiple tickers, so the schema was split in a ticker mapping table against the company CIK, same behaviour on the api, the handling is internal.
+Check [~15.30] -- Claude decided to ignore indications, as it has started doing more often lately, and attempted a rebase of the original `template-service` into this project commit by commit. It left a non working branch with a half baked plan and modifying the context files. I have stopped and I'm fixing the changes, I'm about to start running the loop. 
+- Postmortem. Log of events:
+  1. After doing the manual research, checking the schemas and downloading sample files from the SEC and trying a few api and document fetches I updated and cleaned up this file with all the context I had.
+ 1. I started a claude session in VSC specifically in `/plan` mode (blue prompt box checked) with @schema-survey-review.md first prompt. Indicating to look into this file, and check the schemas and files if we had the right thing and propose snippets of code and subsequent data structures. 
+ 2. I picked, reviewed and cleaned up the code and updated the @setup-prompt.md context file.
+ 3. I reiterated this process once more to ensure the prompt only produced a spec that I'll use to create a plan via `rafa plan create` and run manually, the indication was both in the prompt and in the setup-prompt.md file. 
+ 4. Instead of writing the spec at the end of the task, it wrote its own plan and started executing it without tools or context provided by rafa's tooling. It cherry picked commit by commit from the sibling repo instead of running the proper tooling.
+ 5. I stopped the loop, made it clean up and fix the broken state.
+ 6. rebased the service repo properly.
+ 7. Updated this file.
