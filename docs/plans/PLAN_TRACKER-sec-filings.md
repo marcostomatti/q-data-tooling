@@ -193,7 +193,7 @@ never as passed, when it is off.
 - [x] Add the contract test `tests/contract/aapl-submissions.test.ts` holding the 1001-row parse with 0 failures and the 94-row last-year cut with 13 tracked rows at `now = 2026-11-11`  {agent=tdd-guide effort=medium tests=module}
   - note: the 13 tracked rows are counted by the form as filed (1 10-K, 3 10-Q, 9 8-K); the last year also holds one 8-K/A (2026-09-01), so counting amendments under their base form gives 14. The test pins both.
 - [x] Add the live probe `tests/contract/sec-live.test.ts`, skipped unless `SEC_LIVE=1`, sending `HEAD` to the document, index and ix viewer links built for Apple's 10-K `0000320193-26-000026` and expecting 200 for each  {agent=tdd-guide effort=medium}
-- [ ] Run the response-and-link-validation gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}
+- [x] Run the response-and-link-validation gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}
 
 # Stage: Companies page
 

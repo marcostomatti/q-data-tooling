@@ -24,6 +24,12 @@
       "name": "SEC fetching",
       "commit": "d2524b83c08248661cda58c5b5cd767bcfe22989",
       "via": "step"
+    },
+    {
+      "stage": 4,
+      "name": "Response and link validation",
+      "commit": "f1146601f1460de5bac52b199dd968359fbb7349",
+      "via": "step"
     }
   ]
 }

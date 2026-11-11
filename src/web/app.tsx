@@ -16,6 +16,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { APP } from '../app-config.ts';
 
 import { auth, type SessionState } from './api.ts';
+import { CompaniesPage } from './pages/companies.tsx';
 import { HomePage } from './pages/home.tsx';
 import { LoginPage } from './pages/login.tsx';
 import { TokensPage } from './pages/tokens.tsx';
@@ -32,6 +33,7 @@ export interface AppPage {
 /** The pages behind the sign-in, in nav order. The first is where `/` lands. */
 export const PAGES: readonly AppPage[] = [
   { path: APP.landing.path, label: APP.landing.label, icon: 'house', render: () => <HomePage /> },
+  { path: '/companies', label: 'Companies', icon: 'building-2', render: () => <CompaniesPage /> },
   { path: '/tokens', label: 'Tokens', icon: 'key-round', render: () => <TokensPage /> },
 ];
 

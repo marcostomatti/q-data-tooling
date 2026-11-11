@@ -478,7 +478,7 @@ describe('startService', () => {
 });
 
 describe('APP_PATHS', () => {
-  test('are the sign-in, the app\'s landing page and the tokens page, beside the root', () => {
-    expect(APP_PATHS).toEqual(['/', '/login', APP.landing.path, '/tokens']);
+  test('are the sign-in, the app\'s landing page, the companies page and the tokens page, beside the root', () => {
+    expect(APP_PATHS).toEqual(['/', '/login', APP.landing.path, '/companies', '/tokens']);
   });
 });

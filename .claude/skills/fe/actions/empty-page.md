@@ -47,6 +47,7 @@ an entry after the landing entry, which must stay first. The declaration as it s
 ```tsx
 export const PAGES: readonly AppPage[] = [
   { path: APP.landing.path, label: APP.landing.label, icon: 'house', render: () => <HomePage /> },
+  { path: '/companies', label: 'Companies', icon: 'building-2', render: () => <CompaniesPage /> },
   { path: '/tokens', label: 'Tokens', icon: 'key-round', render: () => <TokensPage /> },
 ];
 ```
@@ -55,7 +56,7 @@ The new entry is one line like the `/tokens` one, with its own path, label, icon
 `<Name>Page`, and it goes after the landing line and before the closing `];`.
 
 **Server path:** `APP_PATHS` in `src/http/server.ts`, which today is
-`['/', '/login', APP.landing.path, '/tokens']`. Add `'/<name>'`, so a reload on the new page is
+`['/', '/login', APP.landing.path, '/companies', '/tokens']`. Add `'/<name>'`, so a reload on the new page is
 served the app and not a 404.
 
 **Pinned lists:** three tests pin these lists exactly, and each fails until you update it in the
@@ -63,8 +64,8 @@ same change. Where a test's title names the old list, retitle it to match.
 
 - `APP_PATHS` in `tests/http/server.test.ts`: add the same `'/<name>'` to its `toEqual`.
 - `PAGES` in `tests/web/pages.test.tsx`, in two tests. The first test of the `the page table`
-  block holds `toEqual([APP.landing.path, '/tokens'])`, and the first of `the pages together`
-  holds the same `toEqual` plus `toHaveLength(2)`. Add `'/<name>'` where it sits in `PAGES`, so
+  block holds `toEqual([APP.landing.path, '/companies', '/tokens'])`, and the first of `the pages together`
+  holds the same `toEqual` plus `toHaveLength(3)`. Add `'/<name>'` where it sits in `PAGES`, so
   after the landing path, and raise the length by one.
 
 **Test:** `tests/web/<name>.test.tsx`. Render `<Name>View` with `renderToStaticMarkup` from
