@@ -1,11 +1,21 @@
+import type { CompanySummary } from '../../../src/routes/filings/contract.ts';
 import type { SummaryQuery, SummarySlice } from '../../../src/routes/filings/summary.flow.ts';
 
 import { describe, expect, test } from 'bun:test';
 
 import { inDomain } from '../../../src/logging.ts';
-import { filingStubStore } from '../../../src/routes/filings/stub.ts';
 import { summarizeFilings } from '../../../src/routes/filings/summary.flow.ts';
 import { captureLog } from '../../support/capture-log.ts';
+
+/** One company's summary, as the store answers it. */
+const SUMMARY: CompanySummary = {
+  cik: 320193,
+  ticker: 'AAPL',
+  name: 'Apple Inc.',
+  counts: { '10-K': 1, '10-Q': 0, '8-K': 0, total: 1 },
+  latest10K: null,
+  filingsSyncedAt: null,
+};
 
 /** A fake store that answers a fixed slice and keeps every query it was asked. */
 function fakeStore(slice: SummarySlice): { store: { summary(query: SummaryQuery): Promise<SummarySlice> }; asked: SummaryQuery[] } {
@@ -31,12 +41,11 @@ describe('summarizeFilings flow, called with no transport', () => {
   });
 
   test('answers the store\'s summaries with the page asked for and the total of every match', async () => {
-    const { items } = await filingStubStore.summary({ form: undefined, offset: 0, limit: 25 });
+    const items = [SUMMARY];
     const { store } = fakeStore({ items, total: 7 });
 
     const page = await summarizeFilings({ page: 1, pageSize: 25 }, { filings: store, log: captureLog().log });
 
-    expect(items.length).toBeGreaterThan(0);
     expect(page).toEqual({ items: [...items], page: 1, pageSize: 25, total: 7 });
   });
 

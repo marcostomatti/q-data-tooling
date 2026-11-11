@@ -9,7 +9,7 @@ import { companyTools } from '../../src/routes/companies/tool.ts';
 import { updateCompany } from '../../src/routes/companies/update.flow.ts';
 import { FilingListInput, FilingListOutput, SummaryInput, SummaryOutput } from '../../src/routes/filings/contract.ts';
 import { listFilings } from '../../src/routes/filings/list.flow.ts';
-import { companyLookupStubStore, filingStubStore } from '../../src/routes/filings/stub.ts';
+import { companyLookupStore, filingStore } from '../../src/routes/filings/repository.ts';
 import { summarizeFilings } from '../../src/routes/filings/summary.flow.ts';
 import { filingTools } from '../../src/routes/filings/tool.ts';
 import { mountRoutes } from '../../src/routes/http.ts';
@@ -17,16 +17,17 @@ import { startTestServer, type TestServer } from '../http/harness.ts';
 import { captureLog } from '../support/capture-log.ts';
 import { connectTools } from '../support/tool-harness.ts';
 
-import { openSeededCompaniesDb } from './companies/seeded-db.ts';
+import { selectOnlyWithSql } from './companies/seeded-db.ts';
+import { openSeededFilingsDb } from './filings/seeded-db.ts';
 
 const { log } = captureLog();
 
-/** The seeded companies the companies routes and tools read; the filings stubs read no table. */
+/** The seeded companies and filings every route and tool here reads. */
 let db: SqliteTestClient;
 let server: TestServer;
 
 beforeAll(async () => {
-  db = await openSeededCompaniesDb();
+  db = await openSeededFilingsDb();
   server = await startTestServer((app) => mountRoutes(app, db, log));
 });
 
@@ -91,10 +92,10 @@ describe('company_update', () => {
 });
 
 describe('filing_list', () => {
-  const deps = { companies: companyLookupStubStore, filings: filingStubStore, log };
+  const deps = (): Parameters<typeof listFilings>[1] => ({ companies: companyLookupStore(db), filings: filingStore(db), log });
 
   test('the flow, the tool and the route answer a company and page that pass FilingListOutput', async () => {
-    const fromFlow = await listFilings(FilingListInput.parse({ ticker: 'aapl' }), deps);
+    const fromFlow = await listFilings(FilingListInput.parse({ ticker: 'aapl' }), deps());
     const fromTool = await toolBody(filingTools, 'filing_list', { ticker: 'aapl' });
     const fromRoute = await routeData('GET', '/api/companies/aapl/filings');
     for (const answer of [fromFlow, fromTool, fromRoute]) {
@@ -103,7 +104,7 @@ describe('filing_list', () => {
   });
 
   test('a company with no filings answers an empty page that passes', async () => {
-    const answer = await listFilings(FilingListInput.parse({ ticker: 'msft' }), deps);
+    const answer = await listFilings(FilingListInput.parse({ ticker: 'wmt' }), deps());
     expect(answer.filings.items).toEqual([]);
     expect(FilingListOutput.safeParse(answer).success).toBe(true);
   });
@@ -111,7 +112,7 @@ describe('filing_list', () => {
 
 describe('filing_summary', () => {
   test('the flow, the tool and the route answer a page that passes SummaryOutput', async () => {
-    const fromFlow = await summarizeFilings(SummaryInput.parse({}), { filings: filingStubStore, log });
+    const fromFlow = await summarizeFilings(SummaryInput.parse({}), { filings: filingStore(db), log });
     const fromTool = await toolBody(filingTools, 'filing_summary', {});
     const fromRoute = await routeData('GET', '/api/filings/summary');
     for (const answer of [fromFlow, fromTool, fromRoute]) {
@@ -119,9 +120,17 @@ describe('filing_summary', () => {
     }
   });
 
-  test('a form no selected company filed answers an empty page that passes', async () => {
-    const answer = await summarizeFilings(SummaryInput.parse({ form: '8-K' }), { filings: filingStubStore, log });
-    expect(answer.items).toEqual([]);
+  test('a form no selected company filed answers zero counts that pass', async () => {
+    const answer = await summarizeFilings(SummaryInput.parse({ form: '8-K' }), { filings: filingStore(db), log });
+    expect(answer.items.length).toBeGreaterThan(0);
+    for (const summary of answer.items) expect(summary.counts.total).toBe(0);
+    expect(SummaryOutput.safeParse(answer).success).toBe(true);
+  });
+
+  test('no selected company answers an empty page that passes', async () => {
+    selectOnlyWithSql(db, []);
+    const answer = await summarizeFilings(SummaryInput.parse({}), { filings: filingStore(db), log });
+    expect(answer).toMatchObject({ items: [], total: 0 });
     expect(SummaryOutput.safeParse(answer).success).toBe(true);
   });
 });

@@ -1,11 +1,24 @@
-import { describe, expect, test } from 'bun:test';
+import type { SqliteTestClient } from '../../support/sqlite-db.ts';
 
-import { STUB_COMPANIES } from '../../../src/routes/companies/stub.ts';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+
 import { DOMAIN, FilingListInput, SummaryInput } from '../../../src/routes/filings/contract.ts';
-import { filingStubStore, STUB_FILINGS } from '../../../src/routes/filings/stub.ts';
 import { filingListTool, filingSummaryTool, filingTools } from '../../../src/routes/filings/tool.ts';
 import { captureLog } from '../../support/capture-log.ts';
 import { connectTools, untouchableDb } from '../../support/tool-harness.ts';
+import { FIXED_FILINGS } from '../fixtures.ts';
+
+import { APPLE_CIK, openSeededFilingsDb } from './seeded-db.ts';
+
+let db: SqliteTestClient;
+
+beforeAll(async () => {
+  db = await openSeededFilingsDb();
+});
+
+afterAll(() => {
+  db.$client.close();
+});
 
 describe('the filing_list tool', () => {
   test('is defined on the shared schema object and marked read-only', () => {
@@ -14,25 +27,25 @@ describe('the filing_list tool', () => {
     expect(filingListTool.annotations?.readOnlyHint).toBe(true);
   });
 
-  test('a call answers the company and one page of its stub filings without touching the database', async () => {
-    const tools = await connectTools(filingTools, untouchableDb());
+  test('a call answers the stored company and one page of its stored filings', async () => {
+    const tools = await connectTools(filingTools, db);
     const outcome = await tools.call('filing_list', { ticker: 'aapl', pageSize: 1 });
     expect(outcome.failed).toBe(false);
-    expect(outcome.body).toEqual({
-      company: STUB_COMPANIES.find((company) => company.ticker === 'AAPL'),
-      filings: { items: STUB_FILINGS.slice(0, 1), page: 1, pageSize: 1, total: STUB_FILINGS.length },
+    expect(outcome.body).toMatchObject({
+      company: { cik: APPLE_CIK, ticker: 'AAPL', name: 'Apple Inc.' },
+      filings: { items: FIXED_FILINGS.slice(0, 1), page: 1, pageSize: 1, total: FIXED_FILINGS.length },
     });
   });
 
   test('a call for a ticker no company trades under fails', async () => {
-    const tools = await connectTools(filingTools, untouchableDb());
+    const tools = await connectTools(filingTools, db);
     const outcome = await tools.call('filing_list', { ticker: 'NOPE' });
     expect(outcome).toEqual({ failed: true, body: { error: { name: 'NotFoundError', message: 'company NOPE does not exist' } } });
   });
 
   test('a call writes the flow\'s line under the Filings domain, which tool.ts binds', async () => {
     const captured = captureLog();
-    const tools = await connectTools(filingTools, untouchableDb(), captured.log);
+    const tools = await connectTools(filingTools, db, captured.log);
 
     await tools.call('filing_list', { ticker: 'AAPL' });
 
@@ -55,19 +68,23 @@ describe('the filing_summary tool', () => {
     expect(filingSummaryTool.annotations?.readOnlyHint).toBe(true);
   });
 
-  test('a call answers one page of the selected stub companies\' summaries', async () => {
-    const expected = await filingStubStore.summary({ form: undefined, offset: 0, limit: 25 });
-    const tools = await connectTools(filingTools, untouchableDb());
+  test('a call answers one page of the stored selected companies\' summaries', async () => {
+    const tools = await connectTools(filingTools, db);
 
     const outcome = await tools.call('filing_summary', {});
 
     expect(outcome.failed).toBe(false);
-    expect(outcome.body).toEqual({ items: [...expected.items], page: 1, pageSize: 25, total: expected.total });
+    expect(outcome.body).toMatchObject({
+      items: [{ cik: APPLE_CIK, ticker: 'AAPL', counts: { '10-K': 1, '10-Q': 0, '8-K': 0, total: 1 }, latest10K: { filingDate: '2026-11-03' } }],
+      page: 1,
+      pageSize: 25,
+      total: 1,
+    });
   });
 
   test('a call writes the flow\'s line under the Filings domain', async () => {
     const captured = captureLog();
-    const tools = await connectTools(filingTools, untouchableDb(), captured.log);
+    const tools = await connectTools(filingTools, db, captured.log);
 
     await tools.call('filing_summary', { form: '10-K' });
 

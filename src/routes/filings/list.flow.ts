@@ -35,8 +35,8 @@ export interface FilingSlice {
 /**
  * What `listFilings` reads: a companies store that resolves a ticker to its company, or
  * `undefined` when no company trades under it, a filings store that pages one company's filings,
- * and the log its transport has bound to the `Filings` domain. This stage passes the fixed stub
- * stores from `stub.ts`.
+ * and the log its transport has bound to the `Filings` domain. The route and the tool pass the
+ * stores `repository.ts` builds over their `db`, which read stored rows only.
  */
 export interface ListFilingsDeps {
   /** The companies store. */

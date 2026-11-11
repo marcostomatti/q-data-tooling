@@ -3,7 +3,7 @@ import { defineTool, type ToolDefinition } from '../../mcp/register.ts';
 
 import { DOMAIN, FilingListInput, SummaryInput } from './contract.ts';
 import { listFilings } from './list.flow.ts';
-import { companyLookupStubStore, filingStubStore } from './stub.ts';
+import { companyLookupStore, filingStore } from './repository.ts';
 import { summarizeFilings } from './summary.flow.ts';
 
 /**
@@ -21,7 +21,7 @@ export const filingListTool: ToolDefinition = defineTool({
     'default), and `page` and `pageSize` choose the page. Fails when no company trades under the ticker.',
   input: FilingListInput,
   annotations: { readOnlyHint: true, openWorldHint: false },
-  run: async (input, { log }) => listFilings(input, { companies: companyLookupStubStore, filings: filingStubStore, log: inDomain(log, DOMAIN) }),
+  run: async (input, { db, log }) => listFilings(input, { companies: companyLookupStore(db), filings: filingStore(db), log: inDomain(log, DOMAIN) }),
 });
 
 /**
@@ -39,7 +39,7 @@ export const filingSummaryTool: ToolDefinition = defineTool({
     'to one base form, and `page` and `pageSize` choose the page.',
   input: SummaryInput,
   annotations: { readOnlyHint: true, openWorldHint: false },
-  run: async (input, { log }) => summarizeFilings(input, { filings: filingStubStore, log: inDomain(log, DOMAIN) }),
+  run: async (input, { db, log }) => summarizeFilings(input, { filings: filingStore(db), log: inDomain(log, DOMAIN) }),
 });
 
 /** The filings tools, in the order of their routes in `filingRoutes`. */

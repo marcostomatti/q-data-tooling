@@ -5,15 +5,14 @@ import { describe, expect, test } from 'bun:test';
 
 import { NotFoundError } from '../../../src/errors.ts';
 import { inDomain } from '../../../src/logging.ts';
-import { STUB_COMPANIES } from '../../../src/routes/companies/stub.ts';
 import { listFilings } from '../../../src/routes/filings/list.flow.ts';
-import { STUB_FILINGS } from '../../../src/routes/filings/stub.ts';
 import { captureLog } from '../../support/capture-log.ts';
+import { FIXED_COMPANIES, FIXED_FILINGS } from '../fixtures.ts';
 
-/** The first stub company, or a loud failure: an empty fixture would otherwise read as a pass. */
+/** The first fixed company, or a loud failure: an empty fixture would otherwise read as a pass. */
 function firstCompany(): Company {
-  const company = STUB_COMPANIES[0];
-  if (company === undefined) throw new Error('STUB_COMPANIES is empty');
+  const company = FIXED_COMPANIES[0];
+  if (company === undefined) throw new Error('FIXED_COMPANIES is empty');
   return company;
 }
 
@@ -50,11 +49,11 @@ describe('listFilings flow, called with no transport', () => {
 
   test('answers the company and the store\'s rows with the page asked for and the total of every match', async () => {
     const company = firstCompany();
-    const { asked: _asked, ...stores } = fakeStores(company, { items: STUB_FILINGS, total: 42 });
+    const { asked: _asked, ...stores } = fakeStores(company, { items: FIXED_FILINGS, total: 42 });
 
     const outcome = await listFilings({ ticker: company.ticker, page: 1, pageSize: 25, sort: '-filingDate' }, { ...stores, log: captureLog().log });
 
-    expect(outcome).toEqual({ company, filings: { items: [...STUB_FILINGS], page: 1, pageSize: 25, total: 42 } });
+    expect(outcome).toEqual({ company, filings: { items: [...FIXED_FILINGS], page: 1, pageSize: 25, total: 42 } });
   });
 
   test('throws a NotFoundError naming the ticker no company trades under, and reads no filings', async () => {

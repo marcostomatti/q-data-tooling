@@ -28,8 +28,8 @@ export interface SummarySlice {
 
 /**
  * What `summarizeFilings` reads: a filings store with the one method it calls, and the log its
- * transport has bound to the `Filings` domain. This stage passes the fixed stub store from
- * `stub.ts`.
+ * transport has bound to the `Filings` domain. The route and the tool pass the store
+ * `repository.ts` builds over their `db`.
  */
 export interface SummarizeFilingsDeps {
   /** The filings store. */

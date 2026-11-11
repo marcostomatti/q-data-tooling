@@ -4,14 +4,14 @@ import { describe, expect, test } from 'bun:test';
 
 import { NotFoundError } from '../../../src/errors.ts';
 import { inDomain } from '../../../src/logging.ts';
-import { STUB_COMPANIES } from '../../../src/routes/companies/stub.ts';
 import { updateCompany } from '../../../src/routes/companies/update.flow.ts';
 import { captureLog } from '../../support/capture-log.ts';
+import { FIXED_COMPANIES } from '../fixtures.ts';
 
-/** The first stub company, or a loud failure: an empty fixture would otherwise read as a pass. */
+/** The first fixed company, or a loud failure: an empty fixture would otherwise read as a pass. */
 function firstCompany(): Company {
-  const company = STUB_COMPANIES[0];
-  if (company === undefined) throw new Error('STUB_COMPANIES is empty');
+  const company = FIXED_COMPANIES[0];
+  if (company === undefined) throw new Error('FIXED_COMPANIES is empty');
   return company;
 }
 

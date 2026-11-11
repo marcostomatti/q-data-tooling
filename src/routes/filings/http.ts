@@ -5,7 +5,7 @@ import { inDomain } from '../../logging.ts';
 
 import { DOMAIN, FilingListInput, FilingListOutput, SummaryInput, SummaryOutput } from './contract.ts';
 import { listFilings } from './list.flow.ts';
-import { companyLookupStubStore, filingStubStore } from './stub.ts';
+import { companyLookupStore, filingStore } from './repository.ts';
 import { summarizeFilings } from './summary.flow.ts';
 
 /**
@@ -17,7 +17,7 @@ import { summarizeFilings } from './summary.flow.ts';
 export const filingListRoute = route('get', '/companies/:ticker/filings', 'filing_list', FilingListInput, {
   summary: 'Lists the company with the ticker and one page of its filings, filtered by base form and sorted by filing date.',
   output: FilingListOutput,
-}, async (input, { log }) => listFilings(input, { companies: companyLookupStubStore, filings: filingStubStore, log: inDomain(log, DOMAIN) }));
+}, async (input, { db, log }) => listFilings(input, { companies: companyLookupStore(db), filings: filingStore(db), log: inDomain(log, DOMAIN) }));
 
 /**
  * `GET /api/filings/summary`, the HTTP twin of the `filing_summary` tool: the same schema object
@@ -27,7 +27,7 @@ export const filingListRoute = route('get', '/companies/:ticker/filings', 'filin
 export const filingSummaryRoute = route('get', '/filings/summary', 'filing_summary', SummaryInput, {
   summary: 'Lists one page of the companies in the summary, each with its filing counts per form and its latest 10-K.',
   output: SummaryOutput,
-}, async (input, { log }) => summarizeFilings(input, { filings: filingStubStore, log: inDomain(log, DOMAIN) }));
+}, async (input, { db, log }) => summarizeFilings(input, { filings: filingStore(db), log: inDomain(log, DOMAIN) }));
 
 /** The filings routes, in the order `ROUTES` lists them. */
 export const filingRoutes: readonly RouteSpec[] = [filingListRoute, filingSummaryRoute];
