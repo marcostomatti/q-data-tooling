@@ -6,6 +6,7 @@ import type {
   SignInState,
   TokenSummary,
 } from '../auth/contract.ts';
+import type { CompanyListOutput } from '../routes/companies/contract.ts';
 
 export type { AuthMode, CreatedToken, SessionState, SignInState, TokenSummary } from '../auth/contract.ts';
 
@@ -79,3 +80,53 @@ export function createAuthClient(fetchImpl: typeof fetch) {
 
 /** The `/auth` calls over the browser's own `fetch`. */
 export const auth = createAuthClient(fetch);
+
+/**
+ * What the Companies page asks `GET /api/companies` for: the page from 1, its size, the search
+ * text, and whether to keep only the companies in the summary.
+ */
+export interface CompanyQuery {
+  /** The page to fetch, from 1. */
+  readonly page: number
+  /** The most companies one page holds. */
+  readonly pageSize: number
+  /** A ticker prefix or part of a name; blank sends no `q`. */
+  readonly q: string
+  /** Keeps only the companies in the summary when set; unset sends no `selected`. */
+  readonly selectedOnly: boolean
+}
+
+/** One page of companies, the `z.infer` type of `CompanyListOutput` in `src/routes/companies/contract.ts`. */
+export type CompanyPage = CompanyListOutput;
+
+/**
+ * Builds the `GET /api/companies` path for a query. A blank `q` is left out, because the route
+ * refuses an empty one, and `selected` is sent only as `true`: the page filters to the selected
+ * companies or not at all.
+ *
+ * @param query - The page, size, search text and selected-only flag to ask for.
+ * @returns The path with its query string, such as `/api/companies?page=1&pageSize=25`.
+ */
+export function companiesPath(query: CompanyQuery): string {
+  const params = new URLSearchParams({ page: String(query.page), pageSize: String(query.pageSize) });
+  const q = query.q.trim();
+  if (q.length > 0) params.set('q', q);
+  if (query.selectedOnly) params.set('selected', 'true');
+  return `/api/companies?${params.toString()}`;
+}
+
+/**
+ * The `/api/companies` calls, each going through `fetchImpl`, so a test can hand in a stand-in.
+ * The answer type is imported as a type only, so the bundle does not carry zod for it.
+ *
+ * @param fetchImpl - The `fetch` every call goes through.
+ * @returns The client, whose `list` resolves to one page of companies or throws an `ApiError`.
+ */
+export function createCompaniesClient(fetchImpl: typeof fetch) {
+  return {
+    list: (query: CompanyQuery): Promise<CompanyPage> => request('GET', companiesPath(query), undefined, fetchImpl),
+  };
+}
+
+/** The `/api/companies` calls over the browser's own `fetch`. */
+export const companies = createCompaniesClient(fetch);

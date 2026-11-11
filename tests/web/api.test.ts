@@ -1,6 +1,15 @@
 import { describe, expect, test } from 'bun:test';
 
-import { ApiError, auth, createAuthClient, request, type SessionState } from '../../src/web/api.ts';
+import {
+  ApiError,
+  auth,
+  companiesPath,
+  createAuthClient,
+  createCompaniesClient,
+  request,
+  type CompanyQuery,
+  type SessionState,
+} from '../../src/web/api.ts';
 
 interface Call {
   readonly path: string
@@ -116,5 +125,31 @@ describe('createAuthClient', () => {
 
   test('auth carries the same calls as a created client', () => {
     expect(Object.keys(auth).sort()).toEqual(Object.keys(createAuthClient(fetch)).sort());
+  });
+});
+
+describe('companiesPath', () => {
+  const base: CompanyQuery = { page: 2, pageSize: 25, q: '', selectedOnly: false };
+
+  test('sends the page and size, and no q or selected when they are unset', () => {
+    expect(companiesPath(base)).toBe('/api/companies?page=2&pageSize=25');
+  });
+
+  test('sends a trimmed q and selected=true', () => {
+    expect(companiesPath({ ...base, q: '  brk b ', selectedOnly: true })).toBe('/api/companies?page=2&pageSize=25&q=brk+b&selected=true');
+  });
+
+  test('a blank q is left out, since the route refuses an empty one', () => {
+    expect(companiesPath({ ...base, q: '   ' })).toBe('/api/companies?page=2&pageSize=25');
+  });
+});
+
+describe('createCompaniesClient', () => {
+  test('list GETs the path and answers the page', async () => {
+    const page = { items: [], page: 1, pageSize: 25, total: 0 };
+    const { fetchImpl, calls } = stubFetch(JSON.stringify({ success: true, data: page }));
+    const query: CompanyQuery = { page: 1, pageSize: 25, q: 'aapl', selectedOnly: false };
+    expect(await createCompaniesClient(fetchImpl).list(query)).toEqual(page);
+    expect(calls.map((call) => `${call.init.method} ${call.path}`)).toEqual(['GET /api/companies?page=1&pageSize=25&q=aapl']);
   });
 });
