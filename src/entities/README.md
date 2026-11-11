@@ -1,8 +1,8 @@
 # Entities
 
 An entity is a domain object: one thing the service stores or passes around, as a
-zod schema plus its inferred type. It holds no behaviour and knows nothing of HTTP,
-MCP or the database.
+zod schema plus its inferred type. It holds no behaviour beyond a pure helper such as `toCik10`, and
+knows nothing of HTTP, MCP or the database.
 
 An entity may import only `zod` and other entities.
 

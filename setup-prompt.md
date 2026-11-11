@@ -557,7 +557,8 @@ writes `src/data/sqlite/tables/<area>.ts` and the `pg` twin. The repositories go
 
 - `companies`: `cik` int PK, `cik10` text unique, `ticker` text, `name`, `selected` bool default
   false, `exchanges` (JSON text), `sic`, `sic_description`, `category`, `fiscal_year_end`,
-  `filings_synced_at`. Index `(name)` and `(selected)`; the list orders by `lower(name)`, which the `(name)` index does not serve.
+  `filings_synced_at`. Index `(name)` and `(selected)`; the list orders by `lower(name)`, which the
+  `(name)` index does not serve.
 - `company_tickers`: `ticker` text PK, `cik` int FK.
 - `filings`: `accession_number` text PK, `cik` int FK, `form`, `base_form`, `is_amendment`,
   `filing_date`, `report_date`, `accepted_at`, `act`, `file_number`, `film_number`, `items`
@@ -601,6 +602,7 @@ primary, and every ticker into `company_tickers`. Inserts go in chunks of 500 wi
    UPLOAD).
 2. A contract test on `tests/fixtures/sec/aapl-submissions.json` (a copy of
    `.tmp/APPL-CIK0000320193.json`): 1001 rows parse with 0 failures. With `now = 2026-11-11`,
-   the last-year cut keeps 94 rows: 1 × 10-K, 3 × 10-Q, 9 × 8-K.
+   the last-year cut keeps 94 rows: 1 × 10-K, 3 × 10-Q, 9 × 8-K as filed. Counting the one
+   8-K/A under its base form makes 10 × 8-K, 14 tracked rows in all.
 3. A live probe, off unless `SEC_LIVE=1`, sends `HEAD` to three built links and expects 200.
 4. The gates: `bun run lint`, `typecheck`, `typecheck:pg`, `bun test`, `privacy`.

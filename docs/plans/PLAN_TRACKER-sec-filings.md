@@ -275,7 +275,7 @@ before the loop (PREREQUISITES); a task that finds it missing reports it as a bl
 
 # Stage: Close-out
 
-- [ ] Verify the definition of done on a scratch `DATABASE_URL` under `.tmp/scratch/`: a fresh `bun run db:migrate`, `bun run db:seed` twice leaving 8,009 companies and 10,414 tickers, `SEC_LIVE=1 bun test tests/contract/sec-live.test.ts` green, an in-process `PATCH /companies/AAPL` with `selected: true` and an API key followed by `GET /companies/AAPL/filings` listing filings with sec.gov `links.document`, `bash scripts/privacy-history.sh origin/main..HEAD` exiting 0, and `git merge-tree --write-tree origin/main HEAD`, recording each output in the close-out notes  {agent=loop-implementer effort=medium}
+- [x] Verify the definition of done on a scratch `DATABASE_URL` under `.tmp/scratch/`: a fresh `bun run db:migrate`, `bun run db:seed` twice leaving 8,009 companies and 10,414 tickers, `SEC_LIVE=1 bun test tests/contract/sec-live.test.ts` green, an in-process `PATCH /companies/AAPL` with `selected: true` and an API key followed by `GET /companies/AAPL/filings` listing filings with sec.gov `links.document`, `bash scripts/privacy-history.sh origin/main..HEAD` exiting 0, and `git merge-tree --write-tree origin/main HEAD`, recording each output in the close-out notes  {agent=loop-implementer effort=medium}
   - Note (close-out run 2026-11-11, `DATABASE_URL=file:.tmp/scratch/dod.db`, a new file): `bun run db:migrate` exit 0, log `"dialect":"sqlite","applied":4,"msg":"applied migrations"`.
   - Note: `bun run db:seed` twice, both exit 0 with `"ran":1,"seeds":["01-companies.ts"]`; after the second run `sqlite3` counts 8009 `companies` and 10414 `company_tickers` (a seed that inserted again would have shown 16018).
   - Note: `SEC_LIVE=1 bun test tests/contract/sec-live.test.ts` exit 0, `1 pass, 0 fail, 1 expect() calls`. Control: without `SEC_LIVE` the same file reports `0 pass, 1 skip`, so the green run did reach sec.gov.
@@ -283,3 +283,10 @@ before the loop (PREREQUISITES); a task that finds it missing reports it as a bl
   - Note: `bash scripts/privacy-history.sh origin/main..HEAD` exit 0, no output, gitleaks on `PATH` (no `gitleaks did not run` line), `PRIVACY_DENYLIST` unset so no denylist; 53 commits in the range. Control: `scripts/privacy-check.ts` on a temp folder with a planted home path exits 1 with `planted.ts:1 home-path`.
   - Note: `git merge-tree --write-tree origin/main HEAD` exit 0, tree `9c067a28318847fd5ce17e7f66783ea5e87f689e`, no conflicts. `origin/main` (4973e74, fetched) is the merge base of HEAD, so the merge is a fast-forward and the check could not have conflicted.
 - [ ] Repair the docs of what this plan changed  {agent=doc-updater docs=repair effort=medium}
+  Close-out notes: docs repaired in the working tree (no commit by the task).
+  - docs/mcp.md: the failed-call body is `{"error": {"name", "message"}}` at both places (the envelope and the tool-error paragraph).
+  - docs/specs/sec-filings.md phase 2: list companies orders by `lower(name)`, then name, then CIK.
+  - setup-prompt.md DoD: 94 rows keep 1 x 10-K, 3 x 10-Q, 9 x 8-K as filed; the 8-K/A makes 10 x 8-K and 14 tracked under base form (matches tests/contract/aapl-submissions.test.ts).
+  - Width repairs for the guard: .claude/skills/fe/actions/empty-page.md (APP_PATHS and PAGES paragraphs), setup-prompt.md (companies shape bullet).
+  - src/entities/README.md: no-behaviour claim qualified for the pure helper `toCik10`.
+  Verified: `bun test tests/docs` 102 pass 0 fail; `bun test --changed=a0349b2...` 0 test files affected; eslint on docs/mcp.md 0 errors.

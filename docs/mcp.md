@@ -45,8 +45,9 @@ more after those. They are the [Open Notebook](open-notebook.md) tools:
 - `notebook_search` searches a notebook, and `notebook_note_add` adds a note to one.
 
 A successful call returns one text block of JSON. A failed call returns `isError: true` with one
-text block, `{"error": "<the message>"}`. A new tool is added by `/be create-route`, which
-[the skills page](skills.md) describes, and the tool is listed in `ALL_TOOLS` in the same change.
+text block, `{"error": {"name": "<the error's name>", "message": "<the message>"}}`. A new tool is
+added by `/be create-route`, which [the skills page](skills.md) describes, and the tool is listed in
+`ALL_TOOLS` in the same change.
 
 ### Logs and trace ids
 
@@ -228,5 +229,6 @@ A client that lists no tools, or fails to start the server, usually started it f
 directory. `.env` and `data/app.db` are read from the directory the command runs in. Use the
 `--cwd` form above, with the clone's absolute path.
 
-A tool that fails answers `isError: true` with `{"error": "<message>"}`. The message is the one the
-tool's error gives, and [the logs](#logs-and-trace-ids) show the trace id of the failed call.
+A tool that fails answers `isError: true` with
+`{"error": {"name": "<name>", "message": "<message>"}}`. The message is the one the tool's
+error gives, and [the logs](#logs-and-trace-ids) show the trace id of the failed call.

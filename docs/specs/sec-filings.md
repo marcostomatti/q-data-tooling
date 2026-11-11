@@ -192,11 +192,11 @@ it.
 3. Write `src/data/seeds/01-companies.ts` ("Seed"): one company per CIK, the first ticker in the
    file as the primary, every ticker in `company_tickers`, chunks of 500,
    `onConflictDoNothing`.
-4. Repositories `src/data/repositories/companies.ts` and `filings.ts`: list companies (by name,
-   `q` as ticker prefix or name contains, `selected`, page and total), resolve a ticker to its
-   company, set `selected`, update the header fields after a sync, insert filings, delete a
-   company's filings before a cutoff, page filings (base form filter, sort), summary counts and
-   latest 10-K per selected company.
+4. Repositories `src/data/repositories/companies.ts` and `filings.ts`: list companies (by
+   `lower(name)`, then name, then CIK; `q` as ticker prefix or name contains, `selected`, page
+   and total), resolve a ticker to its company, set `selected`, update the header fields after a
+   sync, insert filings, delete a company's filings before a cutoff, page filings (base form
+   filter, sort), summary counts and latest 10-K per selected company.
 5. Wire the phase 1 flows to the repositories, except the SEC sync, which phase 3 adds.
 6. Tests:
    - Seeding twice leaves 8,009 companies and 10,414 tickers.
