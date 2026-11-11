@@ -97,7 +97,7 @@ in `src/routes/tools.ts`, and each route in `ROUTES` in `src/routes/http.ts`.
 - [x] Extend `tests/http/openapi.test.ts` to hold that the OpenAPI document lists the four routes with their path, query and body fields and the `{ success: true, data }` 200 envelope  {agent=tdd-guide effort=medium tests=module}
 - [x] Bring `bun run docs:typedoc` to zero warnings over the new contracts, flows, entities and shared schemas by completing their TSDoc  {agent=loop-implementer effort=low skills=documentation}
   Note: plain `docs:typedoc` already had 0 warnings (notDocumented is off by default). Under `--validation.notDocumented` the in-scope count fell from 128 to 17; those 17 are zod `z.enum` key maps, which a source comment cannot document.
-- [ ] Run the endpoints-and-contracts gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}
+- [x] Run the endpoints-and-contracts gates `bun run lint`, `bun run typecheck`, `bun run typecheck:pg` and `bun run privacy`, fixing what they report  {agent=build-error-resolver effort=medium tests=full}
 
 # Stage: Database and seed
 
@@ -111,6 +111,7 @@ list reads stored rows only until the SEC fetching stage adds the sync.
 ```
 
 - [ ] Add the `companies` table with `/db add companies` per "DB tables", both dialects, with its generated drizzle migrations  {agent=loop-implementer effort=medium skills=db tests=module}
+  - Note: `companies` lives in `src/data/<dialect>/tables/companies.ts`; `company_tickers` belongs in the same file. Migrations `0001_add-companies` in both `drizzle/` folders. `db:migrate` was not run against `data/` (the plan forbids editing it); the migrated `:memory:` tests apply it instead.
 - [ ] Add the `company_tickers` table with `/db add company_tickers` per "DB tables", both dialects, with its generated drizzle migrations  {agent=loop-implementer effort=medium skills=db tests=module}
 - [ ] Add the `filings` table with `/db add filings` per "DB tables", including the `(cik, filing_date DESC)` and `(cik, base_form)` indexes, both dialects, with its generated drizzle migrations  {agent=loop-implementer effort=medium skills=db tests=module}
 - [ ] Copy `.tmp/company_tickers.json` to `src/data/seeds/data/company_tickers.json`, reading no other file under `.tmp/`  {tools=Read,Bash model=haiku effort=low}

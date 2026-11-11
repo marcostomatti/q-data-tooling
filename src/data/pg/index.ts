@@ -13,4 +13,5 @@ export { closeDb, getDb, type DrizzleClient } from './client.ts';
 export { transact } from './transaction.ts';
 export { postgresDependency as dbDependency } from './dependency.ts';
 export { apiToken, authSession } from './tables/auth.ts';
+export { companies } from './tables/companies.ts';
 export { appConfig } from './tables/config.ts';

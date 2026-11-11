@@ -7,6 +7,7 @@ import { integer, sqliteTable } from 'drizzle-orm/sqlite-core';
 
 import * as dialect from '../../../src/data/sqlite/index.ts';
 import * as auth from '../../../src/data/sqlite/tables/auth.ts';
+import * as companies from '../../../src/data/sqlite/tables/companies.ts';
 import * as config from '../../../src/data/sqlite/tables/config.ts';
 
 /** Seconds a default timestamp may lie from the test's own clock, for a slow machine. */
@@ -30,20 +31,20 @@ function nearNow(date: Date): boolean {
 let db: Awaited<ReturnType<typeof migratedMemoryDb>>;
 
 beforeEach(async () => {
-  db = await migratedMemoryDb({ ...auth, ...config });
+  db = await migratedMemoryDb({ ...auth, ...companies, ...config });
 });
 
 describe('the SQLite schema', () => {
-  test('declares only the auth tables and the app-config table', () => {
+  test('declares only the auth tables, the app-config table and companies', () => {
     const query = 'select name from sqlite_master where type = \'table\' and name not like \'sqlite_%\' order by name';
     const tables = db.$client
       .query<{ name: string }, []>(query)
       .all()
       .map((row) => row.name);
-    expect(tables).toEqual(['api_token', 'app_config', 'auth_session']);
+    expect(tables).toEqual(['api_token', 'app_config', 'auth_session', 'companies']);
   });
 
-  test('the index exports its dialect, the client, the dependency and the three tables', () => {
+  test('the index exports its dialect, the client, the dependency and the tables', () => {
     expect(dialect.DIALECT).toBe('sqlite');
     expect(Object.keys(dialect).sort()).toEqual([
       'DIALECT',
@@ -51,6 +52,7 @@ describe('the SQLite schema', () => {
       'appConfig',
       'authSession',
       'closeDb',
+      'companies',
       'dbDependency',
       'getDb',
       'transact',
@@ -130,5 +132,62 @@ describe('the SQLite schema', () => {
     // Assert
     expect(row?.value).toEqual(value);
     expect(nearNow(row!.updatedAt)).toBe(true);
+  });
+
+  test('companies defaults selected to false and exchanges to [], and leaves the header fields null', () => {
+    // Act
+    const row = db.insert(companies.companies).values({ cik: 2809, cik10: '0000002809', ticker: 'AEM', name: 'AGNICO EAGLE MINES LTD' })
+      .returning()
+      .get();
+    const raw = db.$client.query<{ selected: number; exchanges: string }, []>('select selected, exchanges from companies').get();
+
+    // Assert
+    expect(row.selected).toBe(false);
+    expect(raw).toEqual({ selected: 0, exchanges: '[]' });
+    expect(row.exchanges).toEqual([]);
+    expect([row.sic, row.sicDescription, row.category, row.fiscalYearEnd, row.filingsSyncedAt]).toEqual([null, null, null, null, null]);
+  });
+
+  test('companies reads back selected, exchanges and filings_synced_at as given, so the defaults check can fail', () => {
+    // Arrange
+    const syncedAt = new Date('2026-11-11T10:00:00Z');
+
+    // Act
+    db.insert(companies.companies).values({
+      cik: 320193, cik10: '0000320193', ticker: 'AAPL', name: 'Apple Inc.', selected: true, exchanges: ['Nasdaq'], filingsSyncedAt: syncedAt,
+    })
+      .run();
+    const row = db.select().from(companies.companies)
+      .where(eq(companies.companies.cik, 320193))
+      .get();
+
+    // Assert
+    expect(row?.selected).toBe(true);
+    expect(row?.exchanges).toEqual(['Nasdaq']);
+    expect(row?.filingsSyncedAt).toEqual(syncedAt);
+  });
+
+  test('companies refuses a second row with the same cik10', () => {
+    // Arrange
+    db.insert(companies.companies).values({ cik: 2809, cik10: '0000002809', ticker: 'AEM', name: 'AGNICO EAGLE MINES LTD' })
+      .run();
+
+    // Act
+    const duplicate = () => db.insert(companies.companies).values({ cik: 2810, cik10: '0000002809', ticker: 'X', name: 'X' })
+      .run();
+
+    // Assert
+    expect(duplicate).toThrow(/UNIQUE/);
+  });
+
+  test('companies carries the name and selected indexes', () => {
+    // Act
+    const indexes = db.$client
+      .query<{ name: string }, []>('select name from sqlite_master where type = \'index\' and tbl_name = \'companies\' and name not like \'sqlite_%\' order by name')
+      .all()
+      .map((row) => row.name);
+
+    // Assert
+    expect(indexes).toEqual(['companies_cik10_unique', 'companies_name_idx', 'companies_selected_idx']);
   });
 });

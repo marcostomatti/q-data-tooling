@@ -6,6 +6,12 @@
       "name": "Project setup",
       "commit": "36f4e86950b8a89b1e32eef60c1f18ceed06e51a",
       "via": "step"
+    },
+    {
+      "stage": 1,
+      "name": "Endpoints and contracts",
+      "commit": "77ea47f5986bde119d51d8f9d405ebc282a09bf7",
+      "via": "step"
     }
   ]
 }

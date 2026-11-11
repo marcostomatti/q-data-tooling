@@ -11,13 +11,13 @@ import * as sqliteDialect from '../../src/data/sqlite/index.ts';
 import { describePg, testPgUrl } from '../support/pg-gate.ts';
 import { openMigratedMemoryDb } from '../support/sqlite-db.ts';
 
-/** The tables the template ships: the auth tables and the app-config key/value table. */
-const EXPECTED_TABLES = ['api_token', 'app_config', 'auth_session'];
+/** The tables the service ships: the auth tables, the app-config key/value table and `companies`. */
+const EXPECTED_TABLES = ['api_token', 'app_config', 'auth_session', 'companies'];
 
 describe('sqlite schema against a migrated :memory: database', () => {
   const tables = Object.values<unknown>(sqliteDialect).filter((value): value is SQLiteTable => is(value, SQLiteTable));
 
-  test('exports exactly the auth tables and the app-config table', () => {
+  test('exports exactly the auth tables, the app-config table and companies', () => {
     expect(tables.map((table) => getSqliteTableConfig(table).name).sort()).toEqual(EXPECTED_TABLES);
   });
 

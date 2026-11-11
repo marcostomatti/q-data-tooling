@@ -57,14 +57,14 @@ default. Run every step for both dialects, whichever is active.
      or listed but not exported, fails the run. Its Postgres half runs only when `TEST_PG_URL` is
      set.
    - `tests/data/sqlite/schema.test.ts` pins every name `src/data/sqlite/index.ts` exports, in
-     its test "the index exports its dialect, the client, the dependency and the three tables".
+     its test "the index exports its dialect, the client, the dependency and the tables".
      Add the export's name, in sorted order.
    - `tests/data/pg/index.test.ts` pins the same sorted list for `src/data/pg/index.ts`, in its
      test "exports the same names as the SQLite one". Add it there too.
-   - `tests/support/sqlite-db.test.ts` pins the table list, and the migration count at 1, in its
-     test "opens :memory: with the migrated tables and the migration record". Add the table name in
-     sorted order. The count rises by one for each migration this change adds, so that expectation
-     moves too.
+   - `tests/support/sqlite-db.test.ts` pins the table list, and the count of migrations in
+     `drizzle/sqlite/`, in its test "opens :memory: with the migrated tables and the migration
+     record". Add the table name in sorted order. The count rises by one for each migration this
+     change adds, so that expectation moves too.
 
 4. **Generate both dialects' migrations.** `bun run db:generate` writes only the active
    dialect's folder, `drizzle/sqlite/` by default. For the other dialect, call drizzle-kit with
