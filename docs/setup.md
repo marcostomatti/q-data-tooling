@@ -1,16 +1,17 @@
 # Setup
 
 This page takes a fresh clone to a running service, then covers the configuration, every
-`package.json` script, the gates, the ESLint hook and the privacy check. The default is SQLite:
-no Docker and no server. Postgres, sign-in and the other add-ons are not set up here.
+`package.json` script, the gates, the ESLint hook and the privacy check. This project runs on
+Postgres in Docker, which the steps below start; sign-in and the other add-ons are not set up
+here, and the [README](../README.md#setup-and-first-run) adds the password.
 
 ## Prerequisites
 
 - **Bun**, version 1.3.14, which is the version CI installs. The project's own commands run
   through `bun`, which also reads `.env` for you.
 - **Git**, to clone, and for the privacy check, which reads the files git tracks.
-- **Docker**, only for Postgres (`bun run db:up`) and the optional Open Notebook stack. SQLite
-  needs neither.
+- **Docker**, running, for the Postgres database (`bun run db:up`) and the optional Open
+  Notebook stack.
 - **gitleaks**, only for the privacy check and the export, which both run it. Without it, the
   check runs with `--no-gitleaks` (see [the gates](#the-gates)). The export refuses to run
   without it.
@@ -32,8 +33,8 @@ changing `bun.lock`.
 cp .env.example .env
 ```
 
-Every line of `.env.example` is commented out, so the copy sets nothing and the defaults apply:
-SQLite at `./data/app.db`, no sign-in and no notebook tools. Two things are not defaults: the
+The copy sets `DATABASE_URL` for the Postgres container, and every other line is commented
+out, so the defaults apply: no sign-in and no notebook tools. Two things are not defaults: the
 service does not start until `API_KEY` or `AUTH_MODE` is set, and it does not start until
 `SEC_USER_AGENT` is set. The first run below sets `API_KEY`; set `SEC_USER_AGENT` in `.env` by
 hand, as `"<app name> <contact email>"`. The [configuration](#configuration) section lists every
@@ -42,11 +43,12 @@ variable.
 ## The first migration
 
 ```sh
+bun run db:up
 bun run db:migrate
 ```
 
-This creates `data/app.db`, and its folder, when they are missing. It then applies the SQLite
-migrations in `drizzle/sqlite/`. A second run applies nothing.
+`db:up` starts Postgres 16 in Docker and waits until it answers. `db:migrate` then applies the
+migrations in `drizzle/pg/`, and a second run applies nothing.
 
 To see where the journal stands, run:
 

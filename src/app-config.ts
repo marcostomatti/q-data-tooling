@@ -10,4 +10,5 @@ export const APP = {
   name: 'SEC filings',
   /** The first page behind the sign-in, where `/` lands: the summary of the selected companies. */
   landing: { path: '/summary', label: 'Summary' },
+  db: 'pg',
 } as const;

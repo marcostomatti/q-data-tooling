@@ -1,8 +1,13 @@
 # Database
 
-This page covers the database: the SQLite default, the switch to Postgres, the migrations that
+This page covers the database: the two dialects, the switch between them, the migrations that
 build the schema, the seeds, and how to recover when the migration journal and the migration
-files disagree. [Setup](setup.md) takes a clone to a running service on SQLite first.
+files disagree.
+
+**This project runs on Postgres.** `#db` points at `./src/data/pg/index.ts`, and the
+[README](../README.md#setup-and-first-run) starts the database with `bun run db:up`. SQLite is
+the template's default, which the sections below still describe, and the unit tests open it in
+memory.
 
 ## What it is and when to turn it on
 

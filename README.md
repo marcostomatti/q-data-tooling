@@ -10,39 +10,82 @@ which brings sign-in, API keys, the HTTP API, MCP tools, the OpenAPI docs and ba
 
 ## Prerequisites
 
-[Bun](https://bun.sh). SQLite is the default database, so there is no Docker and no database
-server to run.
+- [Bun](https://bun.sh) 1.3.14 or later, which runs every command below.
+- [Docker](https://docs.docker.com/get-docker/), running, because the database is Postgres 16 in
+  a container that `docker-compose.yaml` defines. Nothing else needs installing.
 
 ## Setup and first run
 
-Run these once, in order, from the project root:
+Run these once, in order, from the project root. Each step says what it writes, so a step that
+fails can be run again on its own.
+
+1. Install the packages, and create `.env` from the example:
+
+   ```sh
+   bun install
+   cp .env.example .env
+   ```
+
+   The copy already holds `DATABASE_URL` for the Postgres container. Every other line is
+   commented out, and its default applies.
+
+2. Tell SEC who is asking. SEC refuses requests without a declared User-Agent, so the service
+   does not start without one. Open `.env` and set your app name and an email SEC can write to:
+
+   ```ini
+   SEC_USER_AGENT="q-data-tooling you@example.com"
+   ```
+
+3. Start the database, create its tables, and load the companies:
+
+   ```sh
+   bun run db:up && bun run db:migrate && bun run db:seed
+   ```
+
+   `db:up` starts the container and waits until it answers. `db:migrate` creates the tables,
+   and `db:seed` loads the SEC ticker list. Both can run again safely: a second run skips what
+   is already there.
+
+4. Set the sign-in password, and an API key for curl and MCP clients:
+
+   ```sh
+   bun run set-password
+   bun run set-api-key --burn-after-reading
+   ```
+
+   `set-password` asks for the password twice, then writes `AUTH_MODE=password` and the
+   password's hash to `.env`; the password itself is never stored. `set-api-key` writes
+   `API_KEY` to `.env` and shows it once.
+
+5. Build the web app and start the service:
+
+   ```sh
+   bun run serve
+   ```
+
+   Open the address it prints, and sign in at `/login` with the password from step 4.
+
+To stop the database, run `bun run db:down`; its data stays in a Docker volume for the next
+`db:up`. To change the password, run `bun run set-password` again and restart `serve`. A lost
+password is recovered with `bun run reset-credentials`, which removes the hash and signs out
+every session and API token; then run `set-password` again.
+
+## Live code
+
+`bun run serve` builds the web app once, so it shows changes only after a restart. For editing
+while the service runs, use `bun run dev` instead:
 
 ```sh
-bun install
-cp .env.example .env
-bun run set-password            # asks for a password twice; writes AUTH_MODE and its hash to .env
-bun run db:migrate              # creates data/app.db and its tables
-bun run db:seed                 # loads the companies from the SEC ticker list
-bun run serve
+bun run dev
 ```
 
-Then open the address `serve` prints and sign in at `/login` with that password.
+It restarts the service whenever a backend file changes, and rebuilds the web app whenever a
+file under `src/` changes. A rebuild prints `dev: web app rebuilt; reload the page`, and a
+reload of the browser shows it. Ctrl+C stops both.
 
-- **The password** is never written anywhere. `set-password` stores only its scrypt hash, as
-  `AUTH_PASSWORD_HASH` in `.env`, and sets `AUTH_MODE=password`. To change it, run
-  `bun run set-password` again and restart `serve`. A lost password is recovered with
-  `bun run reset-credentials`, which removes the hash and signs out every session and API token;
-  then run `set-password` again.
-- **An API key** is optional, for curl and MCP clients: `bun run set-api-key --burn-after-reading`
-  writes one into `.env` and shows it once.
-- **SEC requests** need a declared User-Agent. Add `SEC_USER_AGENT="<app name> <contact email>"`
-  to `.env`; SEC refuses requests without one, and allows at most 10 per second.
-- **The database** file is created by `db:migrate`, not by `serve`, so run it again after pulling
-  new migrations. `db:seed` can run any number of times; it skips rows already there.
-
-`serve` and `mcp` both read `SEC_USER_AGENT` before they open anything and refuse to start
-without it. The filings list and `selected: true` sync a company's filings from SEC through the
-one client each builds ([spec](docs/specs/sec-filings.md)).
+`serve`, `dev` and `mcp` all read `SEC_USER_AGENT` before they open anything. The filings list
+and `selected: true` sync a company's filings from SEC through the one client each builds
+([spec](docs/specs/sec-filings.md)), at most 10 requests per second.
 
 ## API docs
 
@@ -78,7 +121,8 @@ The template's pages, each covering one part:
   `package.json` script, the gates and the privacy check.
 - [Skills](docs/skills.md): the project skills that generate a route, a page, a table or a
   migration.
-- [Database](docs/database.md): SQLite by default, switching to Postgres, migrations and seeds.
+- [Database](docs/database.md): the two dialects, Postgres for this project and SQLite for the
+  tests, migrations and seeds.
 - [Auth](docs/auth.md): sign-in with a password or OpenID Connect, API keys and API tokens.
 - [Backup](docs/backup.md): scheduled dumps, `bun run backup` and restoring a dump.
 - [MCP](docs/mcp.md): the service's tools for an agent, over stdio or HTTP.
