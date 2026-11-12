@@ -51,20 +51,15 @@ default. Run every step for both dialects, whichever is active.
    can see, such as a unique key that clashes. It logs that as a step on the `log` its caller
    passes, never on a logger of its own, so the flow above it does not log the same failure twice.
 
-3. **Pin the table list.** Four tests pin it, and each fails until it names the new table:
-   - `EXPECTED_TABLES` in `tests/data/schema-tables.test.ts` holds the table name. Its SQLite half
-     compares the list with the tables `src/data/sqlite/index.ts` exports, so a table left out,
-     or listed but not exported, fails the run. Its Postgres half runs only when `TEST_PG_URL` is
-     set.
-   - `tests/data/sqlite/schema.test.ts` pins every name `src/data/sqlite/index.ts` exports, in
-     its test "the index exports its dialect, the client, the dependency and the three tables".
-     Add the export's name, in sorted order.
-   - `tests/data/pg/index.test.ts` pins the same sorted list for `src/data/pg/index.ts`, in its
-     test "exports the same names as the SQLite one". Add it there too.
-   - `tests/support/sqlite-db.test.ts` pins the table list, and the migration count at 1, in its
-     test "opens :memory: with the migrated tables and the migration record". Add the table name in
-     sorted order. The count rises by one for each migration this change adds, so that expectation
-     moves too.
+3. **Pin the table list.** Two tests pin it, and each fails until it names the new table:
+   - `EXPECTED_TABLES` in `tests/integration/data/schema-tables.test.ts` holds the table name. It
+     compares the list with the tables `src/data/pg/index.ts` exports, then checks each table's
+     columns on a migrated scratch database, so it runs under `bun run test:integration`.
+   - `tests/data/pg/index.test.ts` pins the sorted list of names `src/data/pg/index.ts` exports,
+     and the table names, in its tests "exports the same names as the SQLite one" and "names the
+     same tables as the SQLite schema". Add the new names there. Both tests compare with
+     `src/data/sqlite/index.ts` too, so the SQLite table file and its export stay part of the
+     change.
 
 4. **Generate both dialects' migrations.** `bun run db:generate` writes only the active
    dialect's folder, `drizzle/sqlite/` by default. For the other dialect, call drizzle-kit with
@@ -98,27 +93,28 @@ default. Run every step for both dialects, whichever is active.
    migration, every migration on a new database file, and
    `"applied":0,"msg":"database already up to date"` when the database was already up to
    date. The Postgres side is applied when that dialect is active.
-   `tests/data/schema-tables.test.ts` checks it against a scratch database when `TEST_PG_URL`
-   is set.
+   `tests/integration/data/schema-tables.test.ts` checks it against a scratch database under
+   `bun run test:integration`.
 
 7. **Offer a seed file.** Ask whether the table needs starting rows. If it does, write
    `src/data/seeds/<NN>-<name>.ts` as `.claude/skills/db/reference/data-changes.md` describes.
-   If it does not, say so: the template ships no seeds.
+   If it does not, say so.
 
 8. **Document it.** Give each table and each column whose name does not say it all a TSDoc block,
    `/** ... */` before it, in both dialects' files. `docs/documentation.md` holds the rules.
 
 9. **Verify.** Run
-   `bun run typecheck && bun run typecheck:pg && bun run lint && bun test tests/data`. The
-   Postgres tests in `tests/data` are gated by `describePg` in `tests/support/pg-gate.ts`. Without
-   `TEST_PG_URL` they show as skipped, which is not a pass.
+   `bun run typecheck && bun run typecheck:pg && bun run lint && bun test tests/data`, then
+   `bun run db:up && bun run test:integration`. `bun test` leaves `tests/integration/` out, so
+   only the second command checks the table on a real database, and it fails when the server is
+   down.
 
 ## Known limitations
 
 SQLite does not enforce foreign keys, and the template leaves that to the implementor rather than
 wrapping SQLite to behave like Postgres.
 
-- SQLite runs with foreign keys off. `getDb()` and `openMigratedMemoryDb()` never turn
+- SQLite runs with foreign keys off. Its `getDb()` never turns
   `PRAGMA foreign_keys` on, so a key's `onDelete: 'cascade'` and the parent-exists check act on
   Postgres only.
 - On SQLite a delete removes no related rows. The implementor handles it one of two ways: a helper

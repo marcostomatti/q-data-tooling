@@ -258,3 +258,86 @@ describe('the served document', () => {
     expect(Object.keys(revoke)).toContain('404');
   });
 });
+
+/** The parameters of an operation that sit in `place`, by name, with whether each is required. */
+function parametersIn(op: Record<string, unknown>, place: 'path' | 'query'): Record<string, boolean> {
+  const all = (op['parameters'] ?? []) as { in: string; name: string; required: boolean }[];
+  return Object.fromEntries(all.filter((p) => p.in === place).map((p) => [p.name, p.required]));
+}
+
+/** The `application/json` schema an operation's 200 answers with. */
+function okSchema(op: Record<string, unknown>): { required?: string[]; properties?: Record<string, { enum?: unknown[]; properties?: Record<string, unknown> }> } {
+  const responses = op['responses'] as Record<string, { content: { 'application/json': { schema: never } } }>;
+  const ok = responses['200'];
+  if (ok === undefined) throw new Error('the operation has no 200 response');
+  return ok.content['application/json'].schema;
+}
+
+describe('the document of the companies and filings routes', () => {
+  const document = buildOpenApiDocument(ROUTES, INFO);
+
+  test('GUARD: lists the four routes by method and path', () => {
+    const listed = labels(document);
+
+    for (const label of ['GET /api/companies', 'PATCH /api/companies/{ticker}', 'GET /api/companies/{ticker}/filings', 'GET /api/filings/summary']) {
+      expect(listed).toContain(label);
+    }
+  });
+
+  test('GET /companies takes page, pageSize, q and selected as optional query parameters, and no body', () => {
+    const list = operation(document, 'get', '/api/companies');
+
+    expect(parametersIn(list, 'path')).toEqual({});
+    expect(parametersIn(list, 'query')).toEqual({ page: false, pageSize: false, q: false, selected: false });
+    expect(list['requestBody']).toBeUndefined();
+  });
+
+  test('PATCH /companies/{ticker} takes the ticker in the path and a required selected flag as its body', () => {
+    const update = operation(document, 'patch', '/api/companies/{ticker}');
+
+    expect(parametersIn(update, 'path')).toEqual({ ticker: true });
+    expect(parametersIn(update, 'query')).toEqual({});
+    expect(update['requestBody']).toMatchObject({
+      required: true,
+      content: { 'application/json': { schema: { type: 'object', required: ['selected'], properties: { selected: { type: 'boolean' } } } } },
+    });
+    const body = update['requestBody'] as { content: { 'application/json': { schema: { properties: object } } } };
+    expect(Object.keys(body.content['application/json'].schema.properties)).toEqual(['selected']);
+  });
+
+  test('GET /companies/{ticker}/filings takes the ticker in the path and page, pageSize, form and sort as query', () => {
+    const list = operation(document, 'get', '/api/companies/{ticker}/filings');
+
+    expect(parametersIn(list, 'path')).toEqual({ ticker: true });
+    expect(parametersIn(list, 'query')).toEqual({ page: false, pageSize: false, form: false, sort: false });
+    expect(list['requestBody']).toBeUndefined();
+  });
+
+  test('GET /filings/summary takes page, pageSize and form as optional query parameters, and no body', () => {
+    const summary = operation(document, 'get', '/api/filings/summary');
+
+    expect(parametersIn(summary, 'path')).toEqual({});
+    expect(parametersIn(summary, 'query')).toEqual({ page: false, pageSize: false, form: false });
+    expect(summary['requestBody']).toBeUndefined();
+  });
+
+  test('answers each of the four with 200 and { success: true, data } holding its output fields', () => {
+    const dataFields: Record<string, string[]> = {
+      'get /api/companies': ['items', 'page', 'pageSize', 'total'],
+      'get /api/companies/{ticker}/filings': ['company', 'filings'],
+      'get /api/filings/summary': ['items', 'page', 'pageSize', 'total'],
+    };
+
+    for (const [key, fields] of Object.entries(dataFields)) {
+      const [method = '', path = ''] = key.split(' ');
+      const schema = okSchema(operation(document, method, path));
+      expect({ key, required: schema.required }).toEqual({ key, required: ['success', 'data'] });
+      expect({ key, success: schema.properties?.['success']?.enum }).toEqual({ key, success: [true] });
+      expect({ key, data: Object.keys(schema.properties?.['data']?.properties ?? {}) }).toEqual({ key, data: fields });
+    }
+    const update = okSchema(operation(document, 'patch', '/api/companies/{ticker}'));
+    expect(update.required).toEqual(['success', 'data']);
+    expect(update.properties?.['success']?.enum).toEqual([true]);
+    expect(Object.keys(update.properties?.['data']?.properties ?? {})).toContain('ticker');
+  });
+});

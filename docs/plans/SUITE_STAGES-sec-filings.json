@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "stages": [
+    {
+      "stage": 0,
+      "name": "Project setup",
+      "commit": "36f4e86950b8a89b1e32eef60c1f18ceed06e51a",
+      "via": "step"
+    },
+    {
+      "stage": 1,
+      "name": "Endpoints and contracts",
+      "commit": "77ea47f5986bde119d51d8f9d405ebc282a09bf7",
+      "via": "step"
+    },
+    {
+      "stage": 2,
+      "name": "Database and seed",
+      "commit": "f67eb5d29073d146d92b46b195f5f9519f27097a",
+      "via": "step"
+    },
+    {
+      "stage": 3,
+      "name": "SEC fetching",
+      "commit": "d2524b83c08248661cda58c5b5cd767bcfe22989",
+      "via": "step"
+    },
+    {
+      "stage": 4,
+      "name": "Response and link validation",
+      "commit": "f1146601f1460de5bac52b199dd968359fbb7349",
+      "via": "step"
+    },
+    {
+      "stage": 5,
+      "name": "Companies page",
+      "commit": "3253f019f4abce00db3574e1adba466d4dd89561",
+      "via": "step"
+    },
+    {
+      "stage": 6,
+      "name": "Filings view",
+      "commit": "cbcf594e246cf5afe1f4ef878822aaf03b2e8df6",
+      "via": "step"
+    },
+    {
+      "stage": 7,
+      "name": "Summary page",
+      "commit": "3e11f6bb88cc6457a7191ba840dbe4d0be39261a",
+      "via": "step"
+    }
+  ]
+}

@@ -5,12 +5,66 @@ It draws controls from `@open-tomato/components` and styles them with Tailwind 4
 
 ## Page structure
 
-Each page is a pair in `src/web/pages/<name>.tsx`:
+Each page is a pair:
 
 - `XPage` owns fetching and state. Its server access is a prop, defaulting to
   the real client, so a test can inject a fake.
 - `XView` is pure. It takes props and renders. Tests render it with
   `renderToStaticMarkup` from `react-dom/server`, with no DOM.
+
+A page that is only the pair is one file, `src/web/pages/<name>.tsx`, as
+`tokens.tsx` is. A page with more parts is a folder, `src/web/pages/<name>/`,
+one file per part, as `companies/` and `summary/` are:
+
+- `index.tsx` holds `XPage`, the only file `src/web/app.tsx` imports.
+- `view.tsx` holds `XView`, which composes the parts.
+- one `.tsx` per part of the view, such as `toolbar.tsx`, `row.tsx`,
+  `table.tsx` or `chart.tsx`.
+- `logic.ts` holds the page's constants, its server-access interface and its
+  pure functions, with no JSX.
+
+A page draws no heading. The shell's `AppShellTitle` shows the page's nav
+label as the screen's one `h1`. A failed call's message comes from `messageOf`
+in `api.ts`, the one copy every page uses.
+
+## Components
+
+A piece that opens over a page rather than being one sits in
+`src/web/components/<name>/`, split as a page folder is, with its test in
+`tests/web/<name>.test.tsx`. `filings/` is the filings drawer and modal:
+`view.tsx` holds the pure `FilingsView`, and `index.tsx` holds
+`FilingsDialog`, which holds the state and the fetching. The library's
+`Drawer` and `Modal` render nothing without a DOM, so the tests render the
+pure `FilingsPanel` (`panel.tsx`) inside them and read which overlay the view
+returns by calling it.
+In the drawer the panel lists the filings in the library's `Accordion`, one
+group per form bucket: the six named forms, then Other. A closed group renders
+no children, so a test that reads a group's links opens it with `defaultOpen`.
+`pager.tsx` is the one file that is not a folder: the Companies toolbar's pages,
+counted from 1, over the `Pagination` port.
+
+### Ports
+
+`src/web/components/ports/` holds local copies of library components with one
+fix each, until the library takes the fix and the copy is deleted. Each file
+names the library version it copies and the one change it makes.
+
+- `pagination.tsx`, over `page-slots.ts`: the library's `Pagination` with
+  windowing, the first and last pages, the current one with a sibling each
+  side, and an ellipsis for each hidden run. The library draws one button per
+  page, 321 of them for every company.
+- `topbar.tsx`: the library's `AppShellTopbar` with `relative z-50` on the band.
+  The band's `backdrop-filter` makes it a stacking context, so the company
+  search's list painted under positioned page content, such as the Companies
+  toolbar's `Segmented`.
+
+## A page with a path segment
+
+A page can draw the paths under its own: `pageFor` gives `/filings/320193` to the `/filings`
+page, and `render` receives the browser's path, so the Filings page reads the CIK from it with
+`cikFromPath`. Its server path needs the same pattern in `APP_PATHS`, here `/filings/:cik`, so a
+reload there is served the app. The page is keyed by the CIK, so a new company starts on every
+form.
 
 ## Adding a page to `PAGES`
 
@@ -50,15 +104,26 @@ Read a story first. Pass variants and flags only, never a class string.
 ```css
 @import "tailwindcss";
 @import "@open-tomato/components/styles.css";
+@source "../../node_modules/@open-tomato/charts/dist";
 ```
 
-The library's `@source` points Tailwind's scan at the library. Write no
-hand-made CSS here; change the page's composition first.
+The components library's `@source` points Tailwind's scan at that library, and
+the line after it points the scan at `@open-tomato/charts`, which brings no
+`@source` of its own. Below them a `@theme static` block defines every token
+the charts read (`--color-series-1` and the rest), each one a `var()` over a
+semantic variable of the components library, so a chart flips with
+`data-theme` as the library does; `static` keeps a token in the build when no
+class uses it, since the chart reads it from the computed style. The shell
+fills the viewport through `AppShell`'s `viewport` flag, so no rule sizes
+`html`, `body` or `#root`. Write no other hand-made CSS here; change the page's
+composition first.
 
 ## The library version
 
-`package.json` depends on `"@open-tomato/components": "0.1.1"`, the published
-package. It takes React as a peer dependency, so the bundle and the tests use
+`package.json` depends on `"@open-tomato/components": "0.2.0"`, the published
+package. 0.2.0 is the first version that exports `AppShellBrand`,
+`AppShellTitle` and `AppShellSpacer`, which the shell composes in place of
+class strings. It takes React as a peer dependency, so the bundle and the tests use
 this project's one copy of React. A local checkout of the library linked in
 its place brings its own `node_modules/react`, and its hooks then fail with
 "Invalid hook call"; `tests/web/build.test.ts` and

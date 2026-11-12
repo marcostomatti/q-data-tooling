@@ -212,37 +212,32 @@ parameters with `@param name - text`, its result with `@returns`, and each error
 
 ## Tests
 
-Put every test under `tests/routes/<plural>/`, following the three test files in
-`tests/routes/info/`: a flow test, a route test and a tool test.
+Put the flow tests under `tests/routes/<plural>/`, and every test that reads or writes the
+database under `tests/integration/routes/<plural>/`, where `bun test` and CI never run it. The
+three test files in `tests/routes/info/` show the shapes: a flow test, a route test and a tool
+test. Its route reads no table, so its route and tool tests stay unit tests.
 
 - **Flows:** one `<verb>.flow.test.ts` per flow, each with a fake store, a plain object with the
   methods the flow calls. Cover the found row and the missing one. The flow's log is
   `captureLog().log` from `tests/support/capture-log.ts`, bound with
   `inDomain(captured.log, 'Widgets')`. Assert each record's scope, step, level and domain, as
   `tests/routes/info/get.flow.test.ts` does.
-- **Repository:** a repository test on `openMigratedMemoryDb()` from `tests/support/sqlite-db.ts`,
-  closed with `db.$client.close()`. A Postgres run of the same repository goes inside `describePg`
-  from `tests/support/pg-gate.ts`, on `withMigratedPgDatabase` from `tests/support/pg-db.ts`, and
-  reads as skipped without `TEST_PG_URL`, which is not a pass. List the file in
-  `POSTGRES_DIRECT_FILES` in `scripts/test-db.ts` too: `tests/scripts/test-db.test.ts` fails when
-  that list and the files that import `describePg` differ. The repository reads the active dialect's
-  tables, so on the default SQLite build its Postgres run fails (a SQLite timestamp column reads
-  `timestamptz` as `Invalid Date`). Gate each Postgres test on the active dialect too, with
-  `DIALECT` from `src/data/active.ts` widened to `string`, since its literal type refuses the
-  comparison: `const activeDialect: string = DIALECT`, then
-  `test.skipIf(activeDialect !== 'pg')(...)`. Run the database suites with `bun run test:db`. It
-  reads the active dialect from `#db` in `package.json` and does not change it. The Postgres build's
-  suite runs only when `#db` is set to `./src/data/pg/index.ts` and `TEST_PG_URL` answers; the
-  `describePg` files run whenever `TEST_PG_URL` answers, on either build. It prints a line for each
-  suite it left out.
+- **Repository:** an integration test at `tests/integration/routes/<plural>/repository.test.ts`,
+  on a scratch Postgres database from `openTestDatabase()` in `tests/support/test-db.ts`. Open it
+  in `beforeAll`, call `reset()` and seed in `beforeEach`, and `close()` it in `afterAll`. Check
+  stored rows with its `sql` handle, so an assertion does not lean on the code it tests. Postgres
+  hands back real booleans, `jsonb` as values and timestamps as `Date`.
 - **Route:** a route test through `startTestServer` from `tests/http/harness.ts`, mounted with
-  `mountRoutes(app, db, log)` on the same in-memory database, where `log` is a `captureLog().log`.
+  `mountRoutes(app, db, log)` on a scratch database opened the same way, where `log` is a
+  `captureLog().log`. It reads the database, so it is an integration test too, at
+  `tests/integration/routes/<plural>/http.test.ts`.
   Assert four things: a bad field gets a 400 whose `error.message` leads with the field's path, a
   missing id gets a 404 with the name `NotFoundError`, a stray key gets a 400, and the flow's line
   on a request carries the `DOMAIN` from the contract, as `tests/routes/info/http.test.ts` does. A
   stray key comes back as `Unrecognized key: "<key>"` in `error.message` with no field path before
   it, so assert the key there.
-- **Tool:** a tool test through `connectTools` from `tests/support/tool-harness.ts`.
+- **Tool:** a tool test through `connectTools` from `tests/support/tool-harness.ts`, on a scratch
+  database as well, at `tests/integration/routes/<plural>/tool.test.ts`.
 - **Route table:** `tests/http/routes.test.ts` probes every route in `ROUTES` with a stray key and
   expects a 400, so a route whose schema is not strict fails it.
 - **API docs:** `tests/http/openapi.test.ts` checks that every route in `ROUTES` is one operation
@@ -258,17 +253,17 @@ rule. Run it with the rest.
 
 ## Verify
 
-Run `bun run typecheck && bun run typecheck:pg && bun run lint && bun test && bun run test:db`.
-A green `bun test` that skips the Postgres block without `TEST_PG_URL` has not run the Postgres
-side, and neither has one on the SQLite build with `TEST_PG_URL` set, where the dialect gate
-skips it. Read the Postgres line `bun run test:db` prints, since it names the suite it left out.
+Run `bun run typecheck && bun run typecheck:pg && bun run lint && bun test`, then
+`bun run db:up && bun run test:integration`. `bun test` leaves `tests/integration/` out, so it
+never runs the repository, route and tool tests; only the second command does, and it fails when
+the server is down.
 
 ## Known limitations
 
 SQLite does not enforce foreign keys, and the template leaves that to the implementor rather than
 wrapping SQLite to behave like Postgres.
 
-- SQLite runs with foreign keys off. `getDb()` and `openMigratedMemoryDb()` never turn
+- SQLite runs with foreign keys off. Its `getDb()` never turns
   `PRAGMA foreign_keys` on, so a key's `onDelete: 'cascade'` and the parent-exists check act on
   Postgres only.
 - On SQLite a delete removes no related rows. The implementor handles it one of two ways: a helper

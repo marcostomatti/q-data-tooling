@@ -1,8 +1,13 @@
 # Database
 
-This page covers the database: the SQLite default, the switch to Postgres, the migrations that
+This page covers the database: the two dialects, the switch between them, the migrations that
 build the schema, the seeds, and how to recover when the migration journal and the migration
-files disagree. [Setup](setup.md) takes a clone to a running service on SQLite first.
+files disagree.
+
+**This project runs on Postgres.** `#db` points at `./src/data/pg/index.ts`, and the
+[README](../README.md#setup-and-first-run) starts the database with `bun run db:up`. SQLite is
+the template's default, which the sections below still describe. The tests that need a database
+run on Postgres as well, as [integration tests](setup.md#the-integration-tests).
 
 ## What it is and when to turn it on
 
@@ -52,8 +57,9 @@ The Postgres switch changes three things: `#db`, `DATABASE_URL` and the database
    compiles.
 
 If port 5432 is taken, set `DB_PORT` before `bun run db:up`, and the same port in
-`DATABASE_URL`. The Postgres test suites run only when `TEST_PG_URL` names a server that
-answers. [The gates](setup.md#the-gates) run `bun test`, which does not need one.
+`DATABASE_URL`. [The gates](setup.md#the-gates) run `bun test`, which needs no database. The
+tests that need one run with `bun run test:integration` (see
+[the integration tests](setup.md#the-integration-tests)).
 
 ### Migrations
 
@@ -93,11 +99,12 @@ hold after it. Run `bun test tests/data/journal.test.ts` before any migrate, and
 ### Seeds
 
 `bun run db:seed` runs the seed files in the `seeds` folder under `src/data/`, in file-name
-order. The template ships no seed files, and a missing folder means zero seeds, so the command
-logs `no seeds ran` and exits 0. A seed file is named `<NN>-<name>.ts`, with two digits, a dash
-and a lower-case kebab name. A file with any other name stops the run before any seed runs. Each
-seed runs in its own transaction, so a seed that throws leaves none of its own writes behind, and
-the run stops and names the file.
+order. The template ships no seed files; this service ships `01-companies.ts`, which loads the
+SEC ticker list into `companies` and `company_tickers`. A missing folder means zero seeds, so
+the command logs `no seeds ran` and exits 0. A seed file is named `<NN>-<name>.ts`, with two
+digits, a dash and a lower-case kebab name. A file with any other name stops the run before any
+seed runs. Each seed runs in its own transaction, so a seed that throws leaves none of its own
+writes behind, and the run stops and names the file.
 
 The runner records nothing, so every run runs every seed again. A seed must therefore insert
 on its natural key with `onConflictDoNothing()`. A seed imports `appConfig` from
@@ -126,7 +133,6 @@ same meaning.
 | --- | --- | --- | --- |
 | `DATABASE_URL` | unset, `./data/app.db` | SQLite: `file:<path>` or `:memory:`, and SQLite refuses any other value. Postgres: a `postgres://` URL. | `src/data/sqlite/client.ts`, `src/data/pg/client.ts`, `drizzle.config.ts`, `src/data/migrate.ts`, `src/backup/schedule.ts` |
 | `DB_PORT` | `5432` | The host port the Docker Postgres listens on. Set it, and the same port in `DATABASE_URL`, when 5432 is taken. | `docker-compose.yaml` |
-| `TEST_PG_URL` | unset | A Postgres URL for the tests that need a server. The Postgres suites are skipped when it is unset. Point it at a test database. | `scripts/test-db.ts`, `tests/data/migrate.test.ts` |
 
 ## Check it works
 

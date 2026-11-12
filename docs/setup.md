@@ -1,16 +1,17 @@
 # Setup
 
 This page takes a fresh clone to a running service, then covers the configuration, every
-`package.json` script, the gates, the ESLint hook and the privacy check. The default is SQLite:
-no Docker and no server. Postgres, sign-in and the other add-ons are not set up here.
+`package.json` script, the gates, the ESLint hook and the privacy check. This project runs on
+Postgres in Docker, which the steps below start; sign-in and the other add-ons are not set up
+here, and the [README](../README.md#setup-and-first-run) adds the password.
 
 ## Prerequisites
 
 - **Bun**, version 1.3.14, which is the version CI installs. The project's own commands run
   through `bun`, which also reads `.env` for you.
 - **Git**, to clone, and for the privacy check, which reads the files git tracks.
-- **Docker**, only for Postgres (`bun run db:up`) and the optional Open Notebook stack. SQLite
-  needs neither.
+- **Docker**, running, for the Postgres database (`bun run db:up`) and the optional Open
+  Notebook stack.
 - **gitleaks**, only for the privacy check and the export, which both run it. Without it, the
   check runs with `--no-gitleaks` (see [the gates](#the-gates)). The export refuses to run
   without it.
@@ -32,19 +33,22 @@ changing `bun.lock`.
 cp .env.example .env
 ```
 
-Every line of `.env.example` is commented out, so the copy sets nothing and the defaults apply:
-SQLite at `./data/app.db`, no sign-in and no notebook tools. One thing is not a default: the
-service does not start until `API_KEY` or `AUTH_MODE` is set. The first run below sets
-`API_KEY`. The [configuration](#configuration) section lists every variable.
+The copy sets `DATABASE_URL` for the Postgres container, and every other line is commented
+out, so the defaults apply: no sign-in and no notebook tools. Two things are not defaults: the
+service does not start until `API_KEY` or `AUTH_MODE` is set, and it does not start until
+`SEC_USER_AGENT` is set. The first run below sets `API_KEY`; set `SEC_USER_AGENT` in `.env` by
+hand, as `"<app name> <contact email>"`. The [configuration](#configuration) section lists every
+variable.
 
 ## The first migration
 
 ```sh
+bun run db:up
 bun run db:migrate
 ```
 
-This creates `data/app.db`, and its folder, when they are missing. It then applies the SQLite
-migrations in `drizzle/sqlite/`. A second run applies nothing.
+`db:up` starts Postgres 16 in Docker and waits until it answers. `db:migrate` then applies the
+migrations in `drizzle/pg/`, and a second run applies nothing.
 
 To see where the journal stands, run:
 
@@ -57,14 +61,14 @@ clean database exits 0.
 
 ## The first run
 
-Write an API key into `.env`, then start the server:
+With `SEC_USER_AGENT` set in `.env`, write an API key into it, then start the server:
 
 ```sh
-bun run setApiKey --burn-after-reading
+bun run set-api-key --burn-after-reading
 bun run serve
 ```
 
-`setApiKey --burn-after-reading` generates the key, which you do not choose, saves it as
+`set-api-key --burn-after-reading` generates the key, which you do not choose, saves it as
 `API_KEY` in `.env`, and shows it once. The screen clears after 30 seconds, and `cat .env`
 shows the key again.
 
@@ -101,15 +105,19 @@ Every `/api` response uses one envelope: `{ "success": true, "data": ... }`, or 
 bun run build:web
 ```
 
-This compiles the web app into `src/web/dist/`, which git ignores. The server checks for that
-folder when it starts, so restart `bun run serve` after building. With the folder present, the
-service serves the web app at `/` and its other pages as well as the API. Without it, the
-service serves the API only and logs `no web bundle found; serving the API only`.
+This compiles the web app into `src/web/dist/`, which git ignores. `bun run serve` runs this
+build before it starts the server, so a restart of `serve` always shows the current source. The
+server reads the folder once, when it starts, so a build made while it runs shows only after a
+restart. With the folder present, the service serves the web app at `/` and its other pages as
+well as the API. Without it (`bun src/http/server.ts` run directly, with no build before it),
+the service serves the API only and logs `no web bundle found; serving the API only`.
 
 ## Configuration
 
 Set a variable in `.env` only when you need it. Bun reads `.env` on every `bun run`, and git
-ignores the file. Two notes apply to the whole table:
+ignores the file. `bun test` also reads `.env.test`, which is committed, and lets it win over
+`.env`: it sets `DATABASE_URL` to the test server, and every other variable keeps its `.env`
+value (see [the integration tests](#the-integration-tests)). Two notes apply to the whole table:
 
 - The backup schedule is not a variable. It is the `backup` row of the `app_config` table,
   read on every check, with the fields `enabled`, `keep` and `intervalDays`. Its default is
@@ -122,8 +130,8 @@ ignores the file. Two notes apply to the whole table:
 | `DATABASE_URL` | unset, `./data/app.db` | SQLite: `file:<path>` or `:memory:`, and SQLite refuses any other value. Postgres: a `postgres://` URL. | `src/data/sqlite/client.ts`, `src/data/pg/client.ts`, `drizzle.config.ts`, `src/data/migrate.ts`, `src/backup/schedule.ts` |
 | `DB_PORT` | `5432` | The host port the Docker Postgres listens on. Set it, and the same port in `DATABASE_URL`, when 5432 is taken. | `docker-compose.yaml` |
 | `PG_DUMP_BIN` | unset, `pg_dump` from `PATH` | The `pg_dump` the Postgres backup runs, read at each dump. `scripts/pg_dump-docker.sh` runs the container's copy. | `src/backup/pg-dump.ts` |
-| `TEST_PG_URL` | unset | A Postgres URL for the tests that need a server. The Postgres suites are skipped when it is unset. Point it at a test database. | `scripts/test-db.ts`, `tests/data/migrate.test.ts` |
-| `API_KEY` | unset | The key that opens `/api` for a client. `bun run setApiKey` writes it. With neither `API_KEY` nor `AUTH_MODE`, the service refuses to start. | `src/http/server.ts`, `src/auth/access.ts`, `src/auth/set-api-key.ts` |
+| `API_KEY` | unset | The key that opens `/api` for a client. `bun run set-api-key` writes it. With neither `API_KEY` nor `AUTH_MODE`, the service refuses to start. | `src/http/server.ts`, `src/auth/access.ts`, `src/auth/set-api-key.ts` |
+| `SEC_USER_AGENT` | unset, required | The User-Agent sent with every request to SEC, as `"<app name> <contact email>"`. SEC answers 403 to a request without one, so `serve` and the MCP server refuse to start when it is unset, blank, holds no contact email or holds a line break. | `src/sec/config.ts`, `src/http/server.ts`, `src/mcp/server.ts` |
 | `AUTH_MODE` | unset, no sign-in | `password` or `oidc`, one at a time. Any other value stops the start. | `src/auth/config.ts`, `src/auth/set-password.ts` |
 | `AUTH_PASSWORD_HASH` | unset | The scrypt hash of the one password, for `AUTH_MODE=password`. `bun run set-password` writes it. A plain password is refused. | `src/auth/config.ts`, `src/auth/reset-credentials.ts` |
 | `AUTH_COOKIE_SECURE` | unset, `false` | `true` marks the session cookie `Secure`, for a service behind an HTTPS proxy. | `src/auth/cookies.ts` |
@@ -165,10 +173,11 @@ Every script in `package.json`, in the order the file lists them. Run one with `
 | `db:generate` | `drizzle-kit generate` | Writes the migration for the active dialect's schema into `drizzle/<dialect>/`. |
 | `db:migrate` | `bun src/data/migrate.ts` | Applies the active dialect's pending migrations to `DATABASE_URL`. |
 | `db:status` | `bun src/data/migration-status.ts` | Compares the migration files with the journal rows. Exits 1 on a skipped or unknown one. |
-| `db:seed` | `bun src/data/seed.ts` | Runs the seed files in name order, one transaction each. The template ships none. |
-| `setApiKey` | `bun src/auth/set-api-key.ts` | Generates `API_KEY`. With `--burn-after-reading`, saves it to `.env` and shows it once. |
+| `db:seed` | `bun src/data/seed.ts` | Runs the seed files in name order, one transaction each. `01-companies.ts` loads the SEC ticker list. |
+| `set-api-key` | `bun src/auth/set-api-key.ts` | Generates `API_KEY`. With `--burn-after-reading`, saves it to `.env` and shows it once. |
 | `mcp` | `bun src/mcp/server.ts` | Starts the MCP server: stdio by default, HTTP when `MCP_TRANSPORT=http`. |
-| `serve` | `bun src/http/server.ts` | Starts the HTTP service on `PORT`, default 3000, with the web app when it is built. |
+| `serve` | `bun run build:web && bun src/http/server.ts` | Builds the web app, then starts the HTTP service on `PORT`, default 3000. |
+| `dev` | `bun scripts/dev.ts` | Like `serve`, with live code: restarts the service on a backend change and rebuilds the web app on a change under `src/`. Reload the page to see it. |
 | `backup` | `bun src/backup/schedule.ts --once` | Writes one backup into `backups/` and removes the older ones beyond `keep`. |
 | `set-password` | `bun src/auth/set-password.ts` | Asks for the password twice and writes its hash to `AUTH_PASSWORD_HASH` in `.env`. |
 | `reset-credentials` | `bun src/auth/reset-credentials.ts` | Signs out every browser, deletes every API token and removes `AUTH_PASSWORD_HASH`. |
@@ -178,8 +187,7 @@ Every script in `package.json`, in the order the file lists them. Run one with `
 | `docs:openapi` | `bun scripts/export-openapi.ts` | Writes the OpenAPI document the service serves to `.docs/openapi.json`. |
 | `typecheck` | `tsc --noEmit -p .` | Type-checks the active dialect. |
 | `typecheck:pg` | `tsc --noEmit -p tsconfig.pg.json` | Type-checks the Postgres dialect, whichever one is active. |
-| `test:integration` | `bun test tests/integration tests/contract` | Runs the integration and contract tests. |
-| `test:db` | `bun scripts/test-db.ts` | Runs the database suites that fit the active dialect, one line per suite. |
+| `test:integration` | `bun test --path-ignore-patterns= tests/integration` | Runs the tests under `tests/integration/`, each file on a scratch Postgres database. Needs `bun run db:up`. The empty `--path-ignore-patterns=` clears the `bunfig.toml` list that keeps them out of `bun test`. |
 | `lint` | `eslint .` | Lints the tree, including the Markdown under `docs/`. |
 | `lint:fix` | `eslint . --fix` | Applies ESLint's autofixes across the tree. Read the diff afterwards (see [the hook](#the-eslint---fix-hook)). |
 | `privacy` | `bun scripts/privacy-check.ts .` | Scans the tracked files for private data (see [the privacy check](#the-privacy-check)). |
@@ -194,7 +202,9 @@ Run these in this order. Each one reads the tree as it stands.
 4. `bun test`
 5. `bun run privacy`
 
-`bun test` needs no server. Its Postgres tests run only when `TEST_PG_URL` names one.
+`bun test` needs no server: `bunfig.toml` leaves `tests/integration/` out of it, so CI runs it
+with no database. The tests that read or write a database run apart, on your machine (see
+[the integration tests](#the-integration-tests)).
 
 `bun run privacy` needs gitleaks on `PATH`. Without it, run the check with its gitleaks step
 turned off:
@@ -209,6 +219,29 @@ whole one. Run `bun run lint:fix` before the gates to sweep what the hook left.
 The workflows in `.github/workflows/` run the same checks. `ci.yml` runs the first four gates,
 and `privacy.yml` runs the privacy check with gitleaks, reading its denylist from a repository
 secret that it writes outside the checkout.
+
+### The integration tests
+
+A test that reads or writes a real database is an integration test. It lives under
+`tests/integration/`, in the folder its unit tests would use (`tests/integration/repositories/`
+for `tests/repositories/`), and runs on Postgres, the database the service runs on. These tests
+run on your machine only, with Docker up, and never in CI:
+
+```sh
+bun run db:up
+bun run test:integration
+```
+
+Each test file creates a scratch database with `openTestDatabase` from
+`tests/support/test-db.ts`, applies every migration to it, empties it before each test, and
+drops it when the file ends. The database is made on the server `DATABASE_URL` names in
+`.env.test`, and the database that URL names is never opened, so no test writes to your dev
+database. A test that starts the service uses `startServiceProcess` from
+`tests/support/service-process.ts`, which gives the service a scratch database of its own.
+
+With Docker down, the run fails at the first file; no test is skipped. A file whose tests mix
+database-free checks and database checks is split: the database-free half stays in `bun test`,
+so CI still runs it.
 
 ## The ESLint `--fix` hook
 

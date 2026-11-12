@@ -13,6 +13,8 @@ import { DEFAULT_BACKUP_DIR, startBackupSchedule, type BackupWiring } from '../b
 import { dbDependency, getDb } from '../data/active.ts';
 import { inDomain, lazyLogger, scoped, type Log } from '../logging.ts';
 import { mountRoutes } from '../routes/http.ts';
+import { createSecClient } from '../sec/client.ts';
+import { readSecUserAgent } from '../sec/config.ts';
 
 const MAX_PORT = 65_535;
 
@@ -33,8 +35,12 @@ const RATE_LIMIT = { max: 1_000, windowMs: 60_000 } as const;
 /** Where `bun run build:web` writes the web app. */
 const DEFAULT_WEB_DIST = resolve(import.meta.dir, '../web/dist');
 
-/** The paths the web app draws itself, each answered with its `index.html`: `/` lands on `APP.landing.path`. */
-export const APP_PATHS = ['/', '/login', APP.landing.path, '/tokens'];
+/**
+ * The paths the web app draws itself, each answered with its `index.html`: `/` lands on
+ * `APP.landing.path`, and `/filings/:cik` is one company's filings, so a reload there or a
+ * shared link opens the page on that company.
+ */
+export const APP_PATHS = ['/', '/login', APP.landing.path, '/filings', '/filings/:cik', '/companies', '/tokens'];
 
 export interface StartOptions {
   /**
@@ -63,7 +69,7 @@ export class MissingApiKeyError extends Error {
   constructor() {
     super(
       'Neither API_KEY nor AUTH_MODE is set, so nothing could open /api and the service will not start. Run ' +
-        '`bun run setApiKey --burn-after-reading` to write an API_KEY into .env, or set AUTH_MODE (see docs/auth.md).',
+        '`bun run set-api-key --burn-after-reading` to write an API_KEY into .env, or set AUTH_MODE (see docs/auth.md).',
     );
     this.name = 'MissingApiKeyError';
   }
@@ -106,7 +112,7 @@ function resolvePort(requested: number | undefined, env: NodeJS.ProcessEnv): num
 }
 
 /**
- * Whether the key is shorter than one `setApiKey` makes. Short keys are allowed, because a
+ * Whether the key is shorter than one `set-api-key` makes. Short keys are allowed, because a
  * hand-edited `.env` is the user's to write and a floor is a policy choice, but a short key on
  * a service bound to every interface is worth a warning. Only the comparison is made here: the
  * key and its length are never returned or logged.
@@ -156,7 +162,10 @@ function startBackups(db: ReturnType<typeof getDb>, wiring: BackupWiring | undef
  * `cors` is unset too: the app and the API share one origin and one port.
  */
 export async function startService(opts: StartOptions = {}): Promise<ServiceHandle> {
-  // Both are read before anything opens, so a wrong setting stops the start with its own message.
+  // All are read before anything opens, so a wrong setting stops the start with its own message.
+  // The SEC User-Agent goes first: without it no filings sync could succeed, whatever opens /api.
+  // The one SEC client is built here and shared by every route, so its spacing covers them all.
+  const sec = createSecClient({ fetch, userAgent: readSecUserAgent(process.env) });
   const auth = parseAuthConfig(process.env);
   const apiKey = configuredApiKey(process.env, auth);
   const port = resolvePort(opts.port, process.env);
@@ -175,13 +184,13 @@ export async function startService(opts: StartOptions = {}): Promise<ServiceHand
       if (apiKey !== undefined && isShorterThanGenerated(apiKey)) {
         log.warn(
           { step: 'checkKey' },
-          'API_KEY is shorter than the keys `bun run setApiKey` makes, and the service listens on every ' +
-            'network interface; run `bun run setApiKey --burn-after-reading` to replace it with a strong one.',
+          'API_KEY is shorter than the keys `bun run set-api-key` makes, and the service listens on every ' +
+            'network interface; run `bun run set-api-key --burn-after-reading` to replace it with a strong one.',
         );
       }
       app.use('/auth', authRouter(db, auth));
       app.use('/api', requireApiAccess(db, apiKey));
-      mountRoutes(app, db, undefined, auth.mode);
+      mountRoutes(app, db, undefined, auth.mode, sec);
       if (existsSync(webDist)) {
         app.use(express.static(webDist));
         // The app routes in the browser, so a reload on /tokens or the landing page gets the page and not a 404.

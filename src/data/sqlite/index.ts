@@ -13,4 +13,6 @@ export { closeDb, getDb, type DrizzleClient } from './client.ts';
 export { transact } from './transaction.ts';
 export { sqliteDependency as dbDependency } from './dependency.ts';
 export { apiToken, authSession } from './tables/auth.ts';
+export { companies, companyTickers } from './tables/companies.ts';
 export { appConfig } from './tables/config.ts';
+export { filings } from './tables/filings.ts';

@@ -47,13 +47,13 @@ describe('ALL_TOOLS', () => {
 });
 
 describe('ALL_TOOLS without a notebook', () => {
-  test('holds only service_info while OPEN_NOTEBOOK_URL is unset', () => {
+  test('holds service_info and the companies and filings tools while OPEN_NOTEBOOK_URL is unset', () => {
     // `ALL_TOOLS` is built at import and never reads the environment: the notebook tools are
-    // added by `server.ts` only when a notebook is configured, so unset means one tool.
+    // added by `server.ts` only when a notebook is configured, so unset means none of them.
     const saved = process.env.OPEN_NOTEBOOK_URL;
     delete process.env.OPEN_NOTEBOOK_URL;
     try {
-      expect(ALL_TOOLS.map((tool) => tool.name)).toEqual(['service_info']);
+      expect(ALL_TOOLS.map((tool) => tool.name)).toEqual(['service_info', 'company_list', 'company_update', 'filing_list', 'filing_summary']);
     } finally {
       if (saved !== undefined) process.env.OPEN_NOTEBOOK_URL = saved;
     }

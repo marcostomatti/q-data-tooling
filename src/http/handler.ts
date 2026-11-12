@@ -1,4 +1,5 @@
 import type { Db } from '../data/repositories/db.ts';
+import type { SecClient } from '../sec/client.ts';
 import type { Request, RequestHandler, Response } from 'express';
 
 import { randomUUID } from 'node:crypto';
@@ -27,12 +28,14 @@ export type PathOnlyValues<P extends PathOnlySchemas> = { readonly [K in keyof P
 
 /**
  * What a route's `run` receives beside its parsed input: the database, the log of the request,
- * and the path parameters its tool's schema does not name, each parsed on its own schema.
+ * the path parameters its tool's schema does not name, each parsed on its own schema, and the
+ * SEC client the server built, `undefined` when the routes were mounted without one.
  */
 export interface RouteRunContext<P extends PathOnlySchemas> {
   readonly db: Db
   readonly log: Log
   readonly pathOnly: PathOnlyValues<P>
+  readonly sec: SecClient | undefined
 }
 
 /** What a route may pass beside its schema and its work. */
@@ -41,6 +44,8 @@ export interface JsonHandlerOptions<P extends PathOnlySchemas> {
   readonly pathOnly?: P
   /** The MCP tool the route mirrors, named on its 500 line; `route` sets it, a `webRoute` has none. */
   readonly tool?: string
+  /** The SEC client handed to `run` as `sec`; left out, `run` receives `undefined`. */
+  readonly sec?: SecClient
 }
 
 /**
@@ -169,7 +174,7 @@ function parsePathOnly<P extends PathOnlySchemas>(req: Request, schemas: P | und
  * `x-request-id`, and the response answers it in `x-request-id`, on success, 400 and 500 alike,
  * so a caller can quote it.
  *
- * `run` receives one context object, `{ db, log, pathOnly }`. `db` is a parameter so that `run`
+ * `run` receives one context object, `{ db, log, pathOnly, sec }`. `db` is a parameter so that `run`
  * holds no way to obtain a database of its own and a test can hand it any. `log` is a child of the
  * base log the handler is built with, binding the request's `traceId`: it is handed to `run` as it
  * is, for the route to bind its own domain on. A 500 is logged on a child of it that binds domain
@@ -180,7 +185,9 @@ function parsePathOnly<P extends PathOnlySchemas>(req: Request, schemas: P | und
  *
  * `options.pathOnly` is for a path that names more than the tool's schema does (the list in
  * `/lists/:listId/entries/:entryId`): those parameters are withheld from the strict parse, parsed
- * on their own schemas, and handed to `run` as `pathOnly`.
+ * on their own schemas, and handed to `run` as `pathOnly`. `options.sec` is the SEC client the
+ * server built once, handed to `run` as it is, so a route syncs through the one shared client and
+ * its request spacing; without it `run` receives `undefined` and reaches no SEC.
  */
 export function jsonHandler<S extends ZodType, P extends PathOnlySchemas = Record<never, ZodType>>(
   schema: S,
@@ -208,7 +215,7 @@ export function jsonHandler<S extends ZodType, P extends PathOnlySchemas = Recor
       return fail(error);
     }
     try {
-      const data = await run(args, { db, log: traced, pathOnly });
+      const data = await run(args, { db, log: traced, pathOnly, sec: options?.sec });
       res.json({ success: true, data: data === undefined
         ? null
         : data });

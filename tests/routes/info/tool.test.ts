@@ -19,8 +19,8 @@ describe('getServiceInfo', () => {
     expect(ServiceInfoSchema.parse(info)).toEqual(info);
   });
 
-  test('the default build runs on SQLite and the version is a real one', () => {
-    expect(getServiceInfo({}, { env: {}, dialect: DIALECT, log }).dialect).toBe('sqlite');
+  test('the default build runs on Postgres and the version is a real one', () => {
+    expect(getServiceInfo({}, { env: {}, dialect: DIALECT, log }).dialect).toBe('pg');
     expect(getServiceInfo({}, { env: {}, dialect: DIALECT, log }).version).toMatch(/^\d+\.\d+\.\d+/);
   });
 

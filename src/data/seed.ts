@@ -10,7 +10,7 @@
  * The runner does not record which seeds ran: every run runs every file again. A seed is
  * therefore idempotent by contract, writing on a natural key with `onConflictDoNothing`, and
  * the runner does not check it. A missing `src/data/seeds/` folder is zero seeds, not an error,
- * because the template ships none.
+ * because the template ships none. This service ships one, `01-companies.ts`.
  *
  * @module
  */

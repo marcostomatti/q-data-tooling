@@ -1,5 +1,7 @@
 import { ZodError } from 'zod';
 
+import { SecRequestError } from './sec/client.ts';
+
 const HTTP_STATUS = {
   badRequest: 400,
   notFound: 404,
@@ -99,6 +101,7 @@ export function statusFor(error: unknown): number {
   if (error instanceof BulkItemError || error instanceof ZodError) return HTTP_STATUS.badRequest;
   if (error instanceof NotebookUnavailableError) return HTTP_STATUS.unavailable;
   if (error instanceof NotebookRequestError) return HTTP_STATUS.badGateway;
+  if (error instanceof SecRequestError) return HTTP_STATUS.badGateway;
   return HTTP_STATUS.internal;
 }
 
@@ -106,7 +109,9 @@ export function statusFor(error: unknown): number {
  * The classes whose name and message are safe to show a caller. A subclass of one, such as a
  * `ConflictError` subclass, is caught by that entry. The two notebook errors are here because
  * their messages are built from fixed phrases and a status, never from a URL, a key or the
- * notebook's own error text. `ZodError` is not here: the SDK
+ * notebook's own error text. `SecRequestError` and its subclasses are here because their
+ * messages are fixed phrases with the SEC status and the public SEC URL, never the User-Agent
+ * and never SEC's own body. `ZodError` is not here: the SDK
  * parses a tool's input before `run` is reached, so a `ZodError` that arrives here came from
  * inside the server, and its issues could carry stored data.
  */
@@ -116,7 +121,8 @@ function isKnownError(error: unknown): error is Error {
     error instanceof ConflictError ||
     error instanceof BulkItemError ||
     error instanceof NotebookUnavailableError ||
-    error instanceof NotebookRequestError
+    error instanceof NotebookRequestError ||
+    error instanceof SecRequestError
   );
 }
 

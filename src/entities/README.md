@@ -1,12 +1,16 @@
 # Entities
 
 An entity is a domain object: one thing the service stores or passes around, as a
-zod schema plus its inferred type. It holds no behaviour and knows nothing of HTTP,
-MCP or the database.
+zod schema plus its inferred type. It holds no behaviour beyond a pure helper such as `toCik10`, and
+knows nothing of HTTP, MCP or the database.
 
 An entity may import only `zod` and other entities.
 
-Sketch of a note entity, `src/entities/<name>.ts` with `note` as the name (no entity ships yet):
+The entities that ship are `company.ts` (`Company`, `CompanyTicker`, `toCik10`) and `filing.ts`
+(`Filing`, `FilingLinks`, `NamedForm`, `FormBucket`, `bucketOf`). Each names its schema and its
+inferred type alike, so `Company` is both.
+
+Sketch of a note entity, `src/entities/<name>.ts` with `note` as the name:
 
 ```ts
 import { z } from 'zod';

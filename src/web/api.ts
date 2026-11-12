@@ -6,6 +6,8 @@ import type {
   SignInState,
   TokenSummary,
 } from '../auth/contract.ts';
+import type { CompanyListOutput, CompanyUpdateInput, CompanyUpdateOutput } from '../routes/companies/contract.ts';
+import type { FilingListOutput, SummaryOutput } from '../routes/filings/contract.ts';
 
 export type { AuthMode, CreatedToken, SessionState, SignInState, TokenSummary } from '../auth/contract.ts';
 
@@ -23,6 +25,20 @@ export class ApiError extends Error {
     this.status = status;
     this.errorName = errorName;
   }
+}
+
+/**
+ * The message a page shows for a failed call: the error's own message, or the fallback when the
+ * failure is not an `Error`.
+ *
+ * @param failure - What the call threw or rejected with.
+ * @param fallback - The message for a failure that carries none of its own.
+ * @returns The message to show.
+ */
+export function messageOf(failure: unknown, fallback: string): string {
+  return failure instanceof Error
+    ? failure.message
+    : fallback;
 }
 
 type Envelope<T> = { success: true; data: T } | { success: false; error: { name: string; message: string } | string };
@@ -79,3 +95,145 @@ export function createAuthClient(fetchImpl: typeof fetch) {
 
 /** The `/auth` calls over the browser's own `fetch`. */
 export const auth = createAuthClient(fetch);
+
+/**
+ * What the Companies page asks `GET /api/companies` for: the page from 1, its size, the search
+ * text, and whether to keep only the companies in the summary.
+ */
+export interface CompanyQuery {
+  /** The page to fetch, from 1. */
+  readonly page: number
+  /** The most companies one page holds. */
+  readonly pageSize: number
+  /** A ticker prefix, part of a name or a CIK; blank sends no `q`. */
+  readonly q: string
+  /** Keeps only the companies in the summary when set; unset sends no `selected`. */
+  readonly selectedOnly: boolean
+}
+
+/** One page of companies, the `z.infer` type of `CompanyListOutput` in `src/routes/companies/contract.ts`. */
+export type CompanyPage = CompanyListOutput;
+
+/** One company as the server answers it, the `z.infer` type of `CompanyUpdateOutput`. */
+export type Company = CompanyUpdateOutput;
+
+/**
+ * Builds the `GET /api/companies` path for a query. A blank `q` is left out, because the route
+ * refuses an empty one, and `selected` is sent only as `true`: the page filters to the selected
+ * companies or not at all.
+ *
+ * @param query - The page, size, search text and selected-only flag to ask for.
+ * @returns The path with its query string, such as `/api/companies?page=1&pageSize=25`.
+ */
+export function companiesPath(query: CompanyQuery): string {
+  const params = new URLSearchParams({ page: String(query.page), pageSize: String(query.pageSize) });
+  const q = query.q.trim();
+  if (q.length > 0) params.set('q', q);
+  if (query.selectedOnly) params.set('selected', 'true');
+  return `/api/companies?${params.toString()}`;
+}
+
+/**
+ * The `PATCH` path of one company, its ticker encoded so a `/` or `?` in it stays in the segment.
+ *
+ * @param ticker - The company's ticker, such as `AAPL`.
+ * @returns The path, such as `/api/companies/AAPL`.
+ */
+export function companyPath(ticker: string): string {
+  return `/api/companies/${encodeURIComponent(ticker)}`;
+}
+
+/**
+ * The `/api/companies` calls, each going through `fetchImpl`, so a test can hand in a stand-in.
+ * The answer types are imported as types only, so the bundle does not carry zod for them.
+ *
+ * @param fetchImpl - The `fetch` every call goes through.
+ * @returns The client, whose `list` resolves to one page of companies and whose `select` sends
+ *   `PATCH /api/companies/:ticker` with the explicit `selected` boolean, never a toggle, and
+ *   resolves to the company as it stands after; either throws an `ApiError` on a refusal.
+ */
+export function createCompaniesClient(fetchImpl: typeof fetch) {
+  return {
+    list: (query: CompanyQuery): Promise<CompanyPage> => request('GET', companiesPath(query), undefined, fetchImpl),
+    select: (ticker: string, selected: CompanyUpdateInput['selected']): Promise<Company> => {
+      const body = { selected } satisfies Pick<CompanyUpdateInput, 'selected'>;
+      return request('PATCH', companyPath(ticker), body, fetchImpl);
+    },
+  };
+}
+
+/** The `/api/companies` calls over the browser's own `fetch`. */
+export const companies = createCompaniesClient(fetch);
+
+/** One company and one page of its filings, the `z.infer` type of `FilingListOutput` in `src/routes/filings/contract.ts`. */
+export type FilingPage = FilingListOutput;
+
+/** One filing as the server answers it, an item of {@link FilingPage}. */
+export type Filing = FilingPage['filings']['items'][number];
+
+/**
+ * Builds the `GET /api/companies/:ticker/filings` path for one page, newest first, the route's
+ * own default order, every form. The ticker is encoded so a `/` or `?` in it stays in the segment.
+ *
+ * @param ticker - The company's ticker, such as `AAPL`.
+ * @param page - The page to fetch, from 1.
+ * @param pageSize - The most filings one page holds.
+ * @returns The path with its query string, such as `/api/companies/AAPL/filings?page=1&pageSize=100`.
+ */
+export function filingsPath(ticker: string, page: number, pageSize: number): string {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  return `${companyPath(ticker)}/filings?${params.toString()}`;
+}
+
+/**
+ * The `/api/companies/:ticker/filings` call, going through `fetchImpl`, so a test can hand in a
+ * stand-in. The answer type is imported as a type only, so the bundle does not carry zod for it.
+ *
+ * @param fetchImpl - The `fetch` the call goes through.
+ * @returns The client, whose `list` resolves to the company and one page of its filings, and
+ *   throws an `ApiError` on a refusal, such as the 404 for a ticker no company trades under.
+ */
+export function createFilingsClient(fetchImpl: typeof fetch) {
+  return {
+    list: (ticker: string, page: number, pageSize: number): Promise<FilingPage> => request('GET', filingsPath(ticker, page, pageSize), undefined, fetchImpl),
+  };
+}
+
+/** The `/api/companies/:ticker/filings` call over the browser's own `fetch`. */
+export const filings = createFilingsClient(fetch);
+
+/** One page of company summaries, the `z.infer` type of `SummaryOutput` in `src/routes/filings/contract.ts`. */
+export type SummaryPage = SummaryOutput;
+
+/** One company of the summary as the server answers it, an item of {@link SummaryPage}. */
+export type CompanySummary = SummaryPage['items'][number];
+
+/**
+ * Builds the `GET /api/filings/summary` path for one page, every form counted.
+ *
+ * @param page - The page to fetch, from 1.
+ * @param pageSize - The most companies one page holds.
+ * @returns The path with its query string, such as `/api/filings/summary?page=1&pageSize=100`.
+ */
+export function summaryPath(page: number, pageSize: number): string {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  return `/api/filings/summary?${params.toString()}`;
+}
+
+/**
+ * The `/api/filings/summary` call, going through `fetchImpl`, so a test can hand in a stand-in.
+ * The route reads the database only and never calls SEC. The answer type is imported as a type
+ * only, so the bundle does not carry zod for it.
+ *
+ * @param fetchImpl - The `fetch` the call goes through.
+ * @returns The client, whose `list` resolves to one page of the selected companies' summaries
+ *   and throws an `ApiError` on a refusal.
+ */
+export function createSummaryClient(fetchImpl: typeof fetch) {
+  return {
+    list: (page: number, pageSize: number): Promise<SummaryPage> => request('GET', summaryPath(page, pageSize), undefined, fetchImpl),
+  };
+}
+
+/** The `/api/filings/summary` call over the browser's own `fetch`. */
+export const summary = createSummaryClient(fetch);

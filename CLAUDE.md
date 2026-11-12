@@ -30,9 +30,13 @@ path below is a real file in the tree; the web app under `src/web/` is not cover
   rules and the table of every route the template serves.
 - TSDoc: every exported symbol gets a `/** ... */` block, with `@param`, `@returns` and `@throws`
   on a function. `bun run docs:generate` renders it with TypeDoc into `.docs/`.
-- Integration test: `tests/integration/auth-flow.test.ts` is the only integration test, because
-  sign-in is the only place the web app and the backend meet; `bun run test:integration` runs it
-  with `tests/contract/`.
+- Integration test: a test that reads or writes a real database lives under `tests/integration/`,
+  in the folder its unit test would use, and runs on Postgres. Each file opens a scratch database
+  with `openTestDatabase` from `tests/support/test-db.ts`; `startServiceProcess` in
+  `tests/support/service-process.ts` gives a started service its own. `bunfig.toml` keeps them out
+  of `bun test` and CI; `bun run test:integration` runs them, with `bun run db:up` first.
+  `tests/integration/auth-flow.test.ts` is the sign-in flow, the one place the web app and the
+  backend meet.
 - Logging: every line carries a domain, a scope and a step, and every request and tool call carries
   a trace id. `info` is for the critical path only. `inDomain` and `scoped` from `src/logging.ts`
   set the domain and the scope.
@@ -45,7 +49,8 @@ reports on the exact import. `template/no-drizzle-transaction` is the other loca
 `transact` in `src/data/pg/transaction.ts` calls drizzle's `transaction`.
 
 Gates: `bun run lint`, `bun run typecheck`, `bun run typecheck:pg`, `bun test` and
-`bun run privacy`, in that order. Without gitleaks on `PATH`, run
+`bun run privacy`, in that order. A change that touches the database also runs
+`bun run test:integration` with Docker up; CI never does. Without gitleaks on `PATH`, run
 `bun run privacy -- --no-gitleaks`; `tests/privacy.test.ts` runs that scan in `bun test`, with the
 denylist when `PRIVACY_DENYLIST` names it. `.githooks/pre-push` runs the same scan over the
 commits a push sends, once a clone sets `git config core.hooksPath .githooks`. Each Edit or Write

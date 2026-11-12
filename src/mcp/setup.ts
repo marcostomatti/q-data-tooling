@@ -8,6 +8,7 @@
 import type { McpTransport } from './transport.ts';
 import type { Db } from '../data/repositories/db.ts';
 import type { NotebookStartup } from '../notebook/startup.ts';
+import type { SecClient } from '../sec/client.ts';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { inDomain, scoped, type Log } from '../logging.ts';
@@ -30,6 +31,8 @@ export interface McpSetup {
    * child of it.
    */
   readonly log: Log
+  /** The SEC client every tool call is handed; `server.ts` builds it once, a test may leave it out. */
+  readonly sec?: SecClient
 }
 
 /**
@@ -39,7 +42,7 @@ export interface McpSetup {
  * are safe on both transports.
  */
 export function setupMcp(server: McpServer, setup: McpSetup): void {
-  registerTools(server, setup.db, setup.tools, setup.log);
+  registerTools(server, setup.db, setup.tools, setup.log, setup.sec);
   const { notebook, tools } = setup;
   const log = scoped(inDomain(setup.log, DOMAIN), 'start');
   log.info({ step: 'register', tools: tools.length }, 'registered MCP tools');

@@ -1,5 +1,6 @@
 import type { Db } from '../data/repositories/db.ts';
 import type { Log } from '../logging.ts';
+import type { SecClient } from '../sec/client.ts';
 import type { RequestHandler } from 'express';
 import type { z, ZodType } from 'zod';
 
@@ -19,7 +20,8 @@ export type HttpMethod = 'get' | 'post' | 'patch' | 'put' | 'delete';
  * `tools` and `schemas` run in step: `schemas[i]` is the very input schema object of the MCP tool
  * named `tools[i]`. A route that serves more than one tool lists each.
  *
- * `handler` builds the Express handler over the database and the base log `mountRoutes` is given.
+ * `handler` builds the Express handler over the database, the base log and the SEC client
+ * `mountRoutes` is given; the client is `undefined` when the routes are mounted without one.
  *
  * `docs` is what the OpenAPI document (`src/http/openapi.ts`) reads of the route: the very schema
  * the handler parses, the path parameters it parses on their own, the output, and a summary.
@@ -29,7 +31,7 @@ export interface RouteSpec {
   readonly path: string
   readonly tools: readonly string[]
   readonly schemas: readonly ZodType[]
-  readonly handler: (db: Db, log: Log) => RequestHandler
+  readonly handler: (db: Db, log: Log, sec?: SecClient) => RequestHandler
   readonly docs: RouteDocs
 }
 
@@ -80,7 +82,8 @@ export function webRoute<S extends ZodType>(
 
 /**
  * A route that mirrors exactly one tool: the tool's schema, and the work its `run` does. `run`
- * receives `{ db, log, pathOnly }`, `pathOnly` holding the parameters `options.pathOnly` names.
+ * receives `{ db, log, pathOnly, sec }`, `pathOnly` holding the parameters `options.pathOnly`
+ * names and `sec` the SEC client the routes were mounted with.
  * Its 500 line names `tool`. `description` is its summary and output schema, for the OpenAPI
  * document.
  */
@@ -98,7 +101,7 @@ export function route<S extends ZodType, P extends PathOnlySchemas = Record<neve
     path,
     tools: [tool],
     schemas: [schema],
-    handler: (db, log) => jsonHandler(schema, run, db, log, { ...options, tool }),
+    handler: (db, log, sec) => jsonHandler(schema, run, db, log, { ...options, tool, sec }),
     docs: { ...description, input: schema, pathOnly: options?.pathOnly ?? {} },
   };
 }

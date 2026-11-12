@@ -1,8 +1,8 @@
-import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { sql } from 'drizzle-orm';
+import { afterAll, afterEach, describe, expect, test } from 'bun:test';
 
 import { closeDb, getDb, MissingDatabaseUrlError } from '../../../src/data/pg/client.ts';
-import { describePg, testPgUrl } from '../../support/pg-gate.ts';
+
+// The pool against a running server is tested in tests/integration/data/pg/client.test.ts.
 
 const ORIGINAL_URL = process.env.DATABASE_URL;
 
@@ -88,31 +88,5 @@ describe('closeDb', () => {
 
     // Assert
     await expect(closing()).resolves.toBeUndefined();
-  });
-});
-
-describePg('getDb against TEST_PG_URL', () => {
-  beforeEach(() => {
-    process.env.DATABASE_URL = testPgUrl();
-  });
-
-  test('connects to the database named by DATABASE_URL', async () => {
-    // Act
-    const rows = await getDb().execute(sql`select 1 as one`);
-
-    // Assert
-    expect(rows[0]?.one).toBe(1);
-  });
-
-  test('opens a working pool again after closeDb', async () => {
-    // Arrange
-    await getDb().execute(sql`select 1`);
-    await closeDb();
-
-    // Act
-    const rows = await getDb().execute(sql`select 2 as two`);
-
-    // Assert
-    expect(rows[0]?.two).toBe(2);
   });
 });

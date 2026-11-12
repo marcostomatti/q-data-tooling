@@ -1,0 +1,378 @@
+import type { CompanyListFilter } from '../../../src/data/repositories/companies.ts';
+import type { TestDatabase } from '../../support/test-db.ts';
+
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+
+import { findCompanyByTicker, listCompanies, setCompanySelected, updateCompanyHeader } from '../../../src/data/repositories/companies.ts';
+import { seedTickers } from '../../../src/data/seeds/01-companies.ts';
+import { Company } from '../../../src/entities/company.ts';
+import { openTestDatabase } from '../../support/test-db.ts';
+
+/**
+ * A small ticker list shaped like the SEC file. CIK 2809 has a secondary ticker, `AEMRF`, and
+ * the names are chosen so `q` can tell a ticker prefix from a name part: `BRK` is a prefix of
+ * `BRK-B` and no name contains it, `MART` is in `WALMART INC.` and starts no ticker.
+ */
+const TICKERS = {
+  '0': { cik_str: 320193, ticker: 'AAPL', title: 'Apple Inc.' },
+  '1': { cik_str: 2809, ticker: 'AEM', title: 'AGNICO EAGLE MINES LTD' },
+  '2': { cik_str: 2809, ticker: 'AEMRF', title: 'AGNICO EAGLE MINES LTD' },
+  '3': { cik_str: 1067983, ticker: 'BRK-B', title: 'BERKSHIRE HATHAWAY INC' },
+  '4': { cik_str: 104169, ticker: 'WMT', title: 'Walmart Inc.' },
+  '5': { cik_str: 789019, ticker: 'MSFT', title: '100%_Pure Corp' },
+};
+
+/** The names in the order the list must return them: alphabetical, without regard to case. */
+const NAMES_IN_ORDER = ['100%_Pure Corp', 'AGNICO EAGLE MINES LTD', 'Apple Inc.', 'BERKSHIRE HATHAWAY INC', 'Walmart Inc.'];
+
+/** A filter matching every company, in one window wide enough for all of them. */
+const EVERY: CompanyListFilter = { q: undefined, selected: undefined, offset: 0, limit: 100 };
+
+let database: TestDatabase;
+let db: TestDatabase['db'];
+
+beforeAll(async () => {
+  database = await openTestDatabase();
+  db = database.db;
+});
+
+beforeEach(async () => {
+  await database.reset();
+  await seedTickers(db, TICKERS);
+});
+
+afterAll(async () => {
+  await database.close();
+});
+
+/** The names of the companies `filter` lists, in the order it lists them. */
+async function listedNames(filter: Partial<CompanyListFilter>): Promise<string[]> {
+  const page = await listCompanies(db, { ...EVERY, ...filter });
+  return page.items.map((company) => company.name);
+}
+
+/** Marks the company with `cik` selected with SQL, so a filter test does not lean on the code it tests. */
+async function selectWithSql(cik: number): Promise<void> {
+  await database.sql`update companies set selected = true where cik = ${cik}`;
+}
+
+describe('listCompanies', () => {
+  test('orders names alphabetically without regard to case, not capitals before small letters', async () => {
+    // Arrange: in binary order `3M CO` precedes `3i GROUP PLC`, and `APTARGROUP, INC.` precedes `APi Group Corp`
+    await seedTickers(db, {
+      '0': { cik_str: 1, ticker: 'TMMM', title: '3M CO' },
+      '1': { cik_str: 2, ticker: 'TIGP', title: '3i GROUP PLC' },
+      '2': { cik_str: 3, ticker: 'APTR', title: 'APTARGROUP, INC.' },
+      '3': { cik_str: 4, ticker: 'APGC', title: 'APi Group Corp' },
+    });
+
+    // Act
+    const names = await listedNames({});
+
+    // Assert
+    const indexOf = (name: string): number => names.indexOf(name);
+    expect(indexOf('3i GROUP PLC')).toBeLessThan(indexOf('3M CO'));
+    expect(indexOf('APi Group Corp')).toBeLessThan(indexOf('APTARGROUP, INC.'));
+  });
+
+  test('lists every company by name, each one a valid Company, with the total', async () => {
+    // Act
+    const page = await listCompanies(db, EVERY);
+
+    // Assert
+    expect(page.items.map((company) => company.name)).toEqual(NAMES_IN_ORDER);
+    expect(page.total).toBe(5);
+    for (const company of page.items) expect(Company.parse(company)).toEqual(company);
+  });
+
+  test('answers a never-synced company with empty header fields', async () => {
+    // Act
+    const page = await listCompanies(db, { ...EVERY, q: 'AAPL' });
+
+    // Assert
+    expect(page.items).toEqual([{
+      cik: 320193,
+      cik10: '0000320193',
+      ticker: 'AAPL',
+      name: 'Apple Inc.',
+      selected: false,
+      exchanges: [],
+      sic: null,
+      sicDescription: null,
+      category: null,
+      fiscalYearEnd: null,
+      filingsSyncedAt: null,
+    }]);
+  });
+
+  test('pages the list in windows that neither overlap nor skip, each with the full total', async () => {
+    // Act
+    const first = await listCompanies(db, { ...EVERY, offset: 0, limit: 2 });
+    const second = await listCompanies(db, { ...EVERY, offset: 2, limit: 2 });
+    const third = await listCompanies(db, { ...EVERY, offset: 4, limit: 2 });
+
+    // Assert
+    expect([...first.items, ...second.items, ...third.items].map((company) => company.name)).toEqual(NAMES_IN_ORDER);
+    expect([first.total, second.total, third.total]).toEqual([5, 5, 5]);
+    expect(third.items).toHaveLength(1);
+  });
+
+  test('answers the window past the last match with no items and the real total', async () => {
+    // Act
+    const page = await listCompanies(db, { ...EVERY, offset: 100, limit: 25 });
+
+    // Assert
+    expect(page).toEqual({ items: [], total: 5 });
+  });
+
+  test('matches q as a ticker prefix where no name contains it', async () => {
+    // Act / Assert
+    expect(await listedNames({ q: 'BRK' })).toEqual(['BERKSHIRE HATHAWAY INC']);
+  });
+
+  test('matches q as a prefix of a secondary ticker, answering the company with its primary ticker', async () => {
+    // Act
+    const page = await listCompanies(db, { ...EVERY, q: 'AEMR' });
+
+    // Assert
+    expect(page.items.map((company) => [company.cik, company.ticker])).toEqual([[2809, 'AEM']]);
+    expect(page.total).toBe(1);
+  });
+
+  test('does not match q inside a ticker that does not start with it', async () => {
+    // Arrange: `SFT` is inside `MSFT` and in no name, so only a contains-match on tickers would find it
+    // Act / Assert
+    expect(await listedNames({ q: 'SFT' })).toEqual([]);
+  });
+
+  test('matches q as a part of the name in any case', async () => {
+    // Act / Assert
+    expect(await listedNames({ q: 'mart' })).toEqual(['Walmart Inc.']);
+    expect(await listedNames({ q: 'EAGLE' })).toEqual(['AGNICO EAGLE MINES LTD']);
+  });
+
+  test('matches q of digits as a whole CIK, and not as a part of one', async () => {
+    // Act / Assert: 320193 is Apple's CIK; 3201 starts it but is no CIK, so it matches nothing
+    expect(await listedNames({ q: '320193' })).toEqual(['Apple Inc.']);
+    expect(await listedNames({ q: '3201' })).toEqual([]);
+  });
+
+  test('matches q as a CIK written with its leading zeros, as the SEC pads it', async () => {
+    // Act / Assert
+    expect(await listedNames({ q: '0000320193' })).toEqual(['Apple Inc.']);
+  });
+
+  test('matches q as a ticker prefix in any case', async () => {
+    // Act / Assert
+    expect(await listedNames({ q: 'wm' })).toEqual(['Walmart Inc.']);
+  });
+
+  test('lists a company once when both a ticker and the name match q, and counts it once', async () => {
+    // Arrange: `AEM` starts both of CIK 2809's tickers, so a join on tickers would list it twice
+    // Act
+    const page = await listCompanies(db, { ...EVERY, q: 'AEM' });
+
+    // Assert
+    expect(page.items.map((company) => company.cik)).toEqual([2809]);
+    expect(page.total).toBe(1);
+  });
+
+  test('matches % and _ in q as themselves, not as wildcards', async () => {
+    // Act / Assert
+    expect(await listedNames({ q: '%_' })).toEqual(['100%_Pure Corp']);
+    expect(await listedNames({ q: '%' })).toEqual(['100%_Pure Corp']);
+    expect(await listedNames({ q: '_' })).toEqual(['100%_Pure Corp']);
+  });
+
+  test('keeps only the selected companies, or only the others', async () => {
+    // Arrange
+    await selectWithSql(320193);
+    await selectWithSql(104169);
+
+    // Act / Assert
+    expect(await listedNames({ selected: true })).toEqual(['Apple Inc.', 'Walmart Inc.']);
+    expect(await listedNames({ selected: false })).toEqual(['100%_Pure Corp', 'AGNICO EAGLE MINES LTD', 'BERKSHIRE HATHAWAY INC']);
+  });
+
+  test('applies q and selected together, and the total counts only what both keep', async () => {
+    // Arrange
+    await selectWithSql(320193);
+
+    // Act
+    const page = await listCompanies(db, { ...EVERY, q: 'inc', selected: true, limit: 1 });
+
+    // Assert
+    expect(page.items.map((company) => company.name)).toEqual(['Apple Inc.']);
+    expect(page.total).toBe(1);
+  });
+
+  test('counts every match while the window holds fewer', async () => {
+    // Act
+    const page = await listCompanies(db, { ...EVERY, q: 'inc', limit: 1 });
+
+    // Assert
+    expect(page.items.map((company) => company.name)).toEqual(['Apple Inc.']);
+    expect(page.total).toBe(3);
+  });
+});
+
+describe('findCompanyByTicker', () => {
+  test('resolves a primary and a secondary ticker to the same company', async () => {
+    // Act
+    const primary = await findCompanyByTicker(db, 'AEM');
+    const secondary = await findCompanyByTicker(db, 'AEMRF');
+
+    // Assert
+    expect(primary?.cik).toBe(2809);
+    expect(secondary).toEqual(primary);
+    expect(secondary?.ticker).toBe('AEM');
+  });
+
+  test('answers undefined for a ticker no company trades under', async () => {
+    // Act / Assert
+    expect(await findCompanyByTicker(db, 'NOPE')).toBeUndefined();
+  });
+
+  test('matches the ticker exactly, not as a prefix', async () => {
+    // Act / Assert
+    expect(await findCompanyByTicker(db, 'AEMR')).toBeUndefined();
+  });
+});
+
+describe('setCompanySelected', () => {
+  test('sets the flag, answers the company after the change and stores it', async () => {
+    // Act
+    const updated = await setCompanySelected(db, 'AAPL', true);
+
+    // Assert
+    expect(updated?.selected).toBe(true);
+    expect(updated?.cik).toBe(320193);
+    expect(await findCompanyByTicker(db, 'AAPL')).toEqual(updated);
+  });
+
+  test('leaves the company selected when set to true twice', async () => {
+    // Act
+    await setCompanySelected(db, 'AAPL', true);
+    const second = await setCompanySelected(db, 'AAPL', true);
+
+    // Assert
+    expect(second?.selected).toBe(true);
+    expect((await findCompanyByTicker(db, 'AAPL'))?.selected).toBe(true);
+  });
+
+  test('clears the flag when set to false', async () => {
+    // Arrange
+    await selectWithSql(320193);
+
+    // Act
+    const updated = await setCompanySelected(db, 'AAPL', false);
+
+    // Assert
+    expect(updated?.selected).toBe(false);
+    expect((await findCompanyByTicker(db, 'AAPL'))?.selected).toBe(false);
+  });
+
+  test('sets the company of a secondary ticker', async () => {
+    // Act
+    const updated = await setCompanySelected(db, 'AEMRF', true);
+
+    // Assert
+    expect(updated?.cik).toBe(2809);
+    expect((await findCompanyByTicker(db, 'AEM'))?.selected).toBe(true);
+  });
+
+  test('changes no other company', async () => {
+    // Act
+    await setCompanySelected(db, 'AAPL', true);
+
+    // Assert
+    expect(await listedNames({ selected: true })).toEqual(['Apple Inc.']);
+  });
+
+  test('answers undefined for an unknown ticker and changes nothing', async () => {
+    // Act
+    const updated = await setCompanySelected(db, 'NOPE', true);
+
+    // Assert
+    expect(updated).toBeUndefined();
+    expect(await listedNames({ selected: true })).toEqual([]);
+  });
+});
+
+describe('updateCompanyHeader', () => {
+  const syncedAt = new Date('2026-11-10T12:34:56.000Z');
+  const header = {
+    exchanges: ['Nasdaq'],
+    sic: '3571',
+    sicDescription: 'Electronic Computers',
+    category: 'Large accelerated filer',
+    fiscalYearEnd: '0926',
+    syncedAt,
+  };
+
+  test('writes the header fields and the sync time, and answers the company after the change', async () => {
+    // Act
+    const updated = await updateCompanyHeader(db, 320193, header);
+
+    // Assert
+    expect(updated).toEqual({
+      cik: 320193,
+      cik10: '0000320193',
+      ticker: 'AAPL',
+      name: 'Apple Inc.',
+      selected: false,
+      exchanges: ['Nasdaq'],
+      sic: '3571',
+      sicDescription: 'Electronic Computers',
+      category: 'Large accelerated filer',
+      fiscalYearEnd: '0926',
+      filingsSyncedAt: '2026-11-10T12:34:56.000Z',
+    });
+    expect(await findCompanyByTicker(db, 'AAPL')).toEqual(updated);
+    expect(Company.parse(updated)).toEqual(updated as Company);
+  });
+
+  test('keeps the ticker, the name and the selected flag as they were', async () => {
+    // Arrange
+    await selectWithSql(320193);
+
+    // Act
+    const updated = await updateCompanyHeader(db, 320193, header);
+
+    // Assert
+    expect(updated?.selected).toBe(true);
+    expect(updated?.ticker).toBe('AAPL');
+    expect(updated?.name).toBe('Apple Inc.');
+  });
+
+  test('stores the exchanges as a JSON array and changes no other company', async () => {
+    // Act
+    await updateCompanyHeader(db, 320193, { ...header, exchanges: ['Nasdaq', 'NYSE'] });
+
+    // Assert: `jsonb_typeof` tells a stored array from a string that spells one
+    const stored = await database.sql<{ cik: number; type: string; exchanges: unknown }[]>`select cik, jsonb_typeof(exchanges) as type, exchanges from companies order by cik`;
+    expect([...stored]).toEqual([
+      { cik: 2809, type: 'array', exchanges: [] },
+      { cik: 104169, type: 'array', exchanges: [] },
+      { cik: 320193, type: 'array', exchanges: ['Nasdaq', 'NYSE'] },
+      { cik: 789019, type: 'array', exchanges: [] },
+      { cik: 1067983, type: 'array', exchanges: [] },
+    ]);
+  });
+
+  test('writes null header fields as null', async () => {
+    // Arrange
+    await updateCompanyHeader(db, 320193, header);
+
+    // Act
+    const updated = await updateCompanyHeader(db, 320193, { ...header, sic: null, sicDescription: null, category: null, fiscalYearEnd: null });
+
+    // Assert
+    expect([updated?.sic, updated?.sicDescription, updated?.category, updated?.fiscalYearEnd]).toEqual([null, null, null, null]);
+  });
+
+  test('answers undefined for a CIK no company has', async () => {
+    // Act / Assert
+    expect(await updateCompanyHeader(db, 1, header)).toBeUndefined();
+  });
+});

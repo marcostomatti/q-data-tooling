@@ -8,6 +8,27 @@
       "when": 1793971682804,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794418492139,
+      "tag": "0001_add-companies",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794418667105,
+      "tag": "0002_add-company_tickers",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794418826282,
+      "tag": "0003_add-filings",
+      "breakpoints": true
     }
   ]
 }

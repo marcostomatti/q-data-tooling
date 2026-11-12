@@ -1,7 +1,7 @@
 {
   "version": "0.1.0",
   "imports": {
-    "#db": "./src/data/sqlite/index.ts"
+    "#db": "./src/data/pg/index.ts"
   },
   "devDependencies": {
     "@open-tomato/eslint-config": "^0.1.1",
@@ -22,7 +22,7 @@
     "@asteasolutions/zod-to-openapi": "^9.1.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@open-tomato/charts": "^0.1.2",
-    "@open-tomato/components": "0.1.1",
+    "@open-tomato/components": "0.2.0",
     "@open-tomato/service": "^2.0.0",
     "@open-tomato/service-express": "^2.0.0",
     "@open-tomato/service-logger": "^2.0.0",
@@ -43,9 +43,10 @@
     "db:migrate": "bun src/data/migrate.ts",
     "db:status": "bun src/data/migration-status.ts",
     "db:seed": "bun src/data/seed.ts",
-    "setApiKey": "bun src/auth/set-api-key.ts",
+    "set-api-key": "bun src/auth/set-api-key.ts",
     "mcp": "bun src/mcp/server.ts",
-    "serve": "bun src/http/server.ts",
+    "serve": "bun run build:web && bun src/http/server.ts",
+    "dev": "bun scripts/dev.ts",
     "backup": "bun src/backup/schedule.ts --once",
     "set-password": "bun src/auth/set-password.ts",
     "reset-credentials": "bun src/auth/reset-credentials.ts",
@@ -55,8 +56,7 @@
     "docs:openapi": "bun scripts/export-openapi.ts",
     "typecheck": "tsc --noEmit -p .",
     "typecheck:pg": "tsc --noEmit -p tsconfig.pg.json",
-    "test:integration": "bun test tests/integration tests/contract",
-    "test:db": "bun scripts/test-db.ts",
+    "test:integration": "bun test --path-ignore-patterns= tests/integration",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "privacy": "bun scripts/privacy-check.ts ."

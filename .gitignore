@@ -9,6 +9,8 @@ node_modules/
 .env
 .env.*
 !.env.example
+# The test settings hold only the local Docker server's URL, which `.env.example` also shows.
+!.env.test
 
 # Personal variants of Claude skills: your own settings and preferences stay local.
 .claude/skills/personal-*/
