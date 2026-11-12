@@ -238,18 +238,10 @@ describe('the summary table', () => {
     expect(NO_FILING_DATE).toBe('—');
   });
 
-  test('names each form column as the story names its double-line column: the top line, a dot, the bottom line', () => {
+  test('names each form column by its form alone, so the column is as narrow as its date', () => {
     const headers = summaryColumns().filter((column) => (FORM_BUCKETS as readonly string[]).includes(column.key))
       .map((column) => column.header);
-    expect(headers).toEqual([
-      '10-K · Latest',
-      '10-Q · Latest',
-      '8-K · Latest',
-      '6-K · Latest',
-      'Form 4 · Latest',
-      'Form 144 · Latest',
-      'Other · Latest',
-    ]);
+    expect(headers).toEqual(['10-K', '10-Q', '8-K', '6-K', 'Form 4', 'Form 144', 'Other']);
   });
 
   test('fixes every width but the name\'s, which takes the rest and truncates a long name', () => {
@@ -257,20 +249,21 @@ describe('the summary table', () => {
     expect(widths).toEqual({
       'ticker': 96,
       'name': undefined,
-      '10-K': 148,
-      '10-Q': 148,
-      '8-K': 140,
-      '6-K': 140,
-      '4': 160,
-      '144': 176,
-      'other': 156,
+      '10-K': 100,
+      '10-Q': 100,
+      '8-K': 100,
+      '6-K': 100,
+      '4': 100,
+      '144': 112,
+      'other': 100,
       'remove': 112,
     });
     expect(summaryColumns().find((column) => column.key === 'name')?.overflow).toBe('truncate');
   });
 
   test('keeps the table at least as wide as its fixed columns and the name\'s least, scrolling sideways below that', () => {
-    expect(SUMMARY_MIN_WIDTH).toBe(96 + 200 + 112 + 148 + 148 + 140 + 140 + 160 + 176 + 156);
+    expect(SUMMARY_MIN_WIDTH).toBe(96 + 180 + 112 + 100 + 100 + 100 + 100 + 100 + 112 + 100);
+    expect(SUMMARY_MIN_WIDTH).toBe(1100);
     const box = SummaryTable({ companies: [APPLE] }) as ReactElement<Props>;
     const inner = box.props.children as ReactElement<Props>;
     expect(box.props.className).toBe('overflow-x-auto');
