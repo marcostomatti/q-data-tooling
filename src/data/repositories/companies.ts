@@ -65,6 +65,22 @@ type CompanyRow = typeof companies.$inferSelect;
 /** The character that escapes `%`, `_` and itself in a `like` pattern built from `q`. */
 const LIKE_ESCAPE = '\\';
 
+/**
+ * The order of company names: lower-cased, then compared in ICU's English collation, the order
+ * `localeCompare` with `'en'` gives in JavaScript. It is named, and not left to the database's
+ * default, because a Postgres server's default collation is the locale it was created with: the
+ * Docker image's `en_US.utf8` skips spaces and punctuation on its first pass and puts
+ * `AIRWA INC.` before `Air Water Inc./ADR`, and a server created with another locale would
+ * answer yet another order. `en-x-icu` is a Postgres collation; SQLite has none of the ICU ones,
+ * and this project runs on Postgres only.
+ *
+ * @param name - The name column to order by.
+ * @returns The expression to pass to `asc`.
+ */
+export function nameOrder(name: AnyColumn): SQL {
+  return sql`lower(${name}) collate "en-x-icu"`;
+}
+
 /** `text` with the `like` wildcards and the escape character escaped, so each matches itself. */
 function escapeLike(text: string): string {
   return text.replace(/[\\%_]/g, (character) => `${LIKE_ESCAPE}${character}`);
@@ -141,9 +157,9 @@ function cikOf(db: Db, ticker: string) {
 
 /**
  * One window of companies by name, filtered by `q` and `selected`, and the count of every
- * match. The order is alphabetical without regard to case, as `lower(name)` gives it, since the
- * database's own text order puts `3M CO` before `3i GROUP PLC` and every capital before any
- * small letter. Names that differ only in case keep the database's order, then CIK order, so
+ * match. The order is alphabetical without regard to case, as {@link nameOrder} gives it, since
+ * a plain text order can put `3M CO` before `3i GROUP PLC` and every capital before any small
+ * letter. Names that differ only in case keep the database's order, then CIK order, so
  * the windows of one list never overlap.
  * A window past the last match is empty and still carries the real total. The window and the
  * count are two reads, not one snapshot: a write between them can make the total disagree
@@ -158,7 +174,7 @@ export async function listCompanies(db: Db, filter: CompanyListFilter): Promise<
   const where = listCondition(db, filter);
   const rows = await db.select().from(companies)
     .where(where)
-    .orderBy(asc(sql`lower(${companies.name})`), asc(companies.name), asc(companies.cik))
+    .orderBy(asc(nameOrder(companies.name)), asc(companies.name), asc(companies.cik))
     .limit(filter.limit)
     .offset(filter.offset);
   const [counted] = await db.select({ total: count() }).from(companies)

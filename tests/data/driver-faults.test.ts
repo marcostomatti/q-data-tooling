@@ -1,11 +1,9 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
-import { Database } from 'bun:sqlite';
 import { describe, expect, test } from 'bun:test';
 
 import { faultCode, UNKNOWN_FAULT_CODE } from '../../src/data/driver-faults.ts';
+
+// The code of a real driver fault, from a running server, is read in
+// tests/integration/data/driver-faults.test.ts.
 
 describe('faultCode', () => {
   test('reads the code of the error itself', () => {
@@ -13,25 +11,8 @@ describe('faultCode', () => {
   });
 
   test('reads the code of the driver error Drizzle wraps as the cause', () => {
-    const wrapped = new Error('Failed query', { cause: Object.assign(new Error('x'), { code: 'SQLITE_BUSY' }) });
-    expect(faultCode(wrapped)).toBe('SQLITE_BUSY');
-  });
-
-  test('reads the code bun:sqlite gives a database it cannot open', () => {
-    // Arrange
-    const dir = mkdtempSync(join(tmpdir(), 'driver-faults-'));
-    let error: unknown;
-
-    // Act
-    try {
-      new Database(join(dir, 'missing', 'x.db'));
-    } catch (caught: unknown) {
-      error = caught;
-    }
-    rmSync(dir, { recursive: true, force: true });
-
-    // Assert
-    expect(faultCode(error)).toBe('SQLITE_CANTOPEN');
+    const wrapped = new Error('Failed query', { cause: Object.assign(new Error('x'), { code: '40001' }) });
+    expect(faultCode(wrapped)).toBe('40001');
   });
 
   test('falls back to unknown when no string code is there', () => {

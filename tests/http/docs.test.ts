@@ -1,42 +1,27 @@
-import type { Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
+import type { ApiApp } from './api-app.ts';
 
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import express from 'express';
 
-import { requireApiAccess } from '../../src/auth/access.ts';
-import { mountRoutes } from '../../src/routes/http.ts';
-import { openMigratedMemoryDb, type SqliteTestClient } from '../support/sqlite-db.ts';
+import { NO_DATABASE, startApiApp } from './api-app.ts';
 
 /** Made up for this file, and built rather than written out, so no scan reads it as a secret. */
 const TEST_KEY = `docs-route-test-key-${'0'.repeat(32)}`;
 
 const AUTHORIZED = { authorization: `Bearer ${TEST_KEY}` };
 
-let db: SqliteTestClient;
-let server: Server;
-let origin: string;
+let app: ApiApp;
 
+// No database: the docs are static, and a request either carries the key or no credential at
+// all, so the credential check never looks a token or a session up.
 beforeAll(async () => {
-  db = await openMigratedMemoryDb();
-  // The same order `startService` mounts them in: the credential check on /api, then the routes.
-  const app = express();
-  app.use(express.json({ limit: '1mb' }));
-  app.use('/api', requireApiAccess(db, TEST_KEY));
-  mountRoutes(app, db);
-  server = await new Promise<Server>((ready) => {
-    const listening = app.listen(0, () => ready(listening));
-  });
-  origin = `http://localhost:${(server.address() as AddressInfo).port}`;
+  app = await startApiApp(NO_DATABASE, TEST_KEY);
 });
 
 afterAll(async () => {
-  server.closeAllConnections();
-  await new Promise<void>((done) => server.close(() => done()));
-  db.$client.close();
+  await app.close();
 });
 
-const get = (path: string, headers: Record<string, string> = AUTHORIZED): Promise<Response> => fetch(`${origin}${path}`, { headers });
+const get = (path: string, headers: Record<string, string> = AUTHORIZED): Promise<Response> => fetch(`${app.origin}${path}`, { headers });
 
 describe('the API docs behind the /api credential check', () => {
   test('refuses the document and the docs page to a request without a credential', async () => {

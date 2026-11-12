@@ -65,15 +65,15 @@ route mirrors an MCP tool (the default is yes), and whether any route is for the
 **Creates.** Under `src/routes/<plural>/`: contract.ts, which holds the strict input and output
 schemas and the domain; one flow file per method, named `<verb>.flow.ts`; repository.ts, which holds
 the drizzle queries over a `Db`; http.ts, with one route per method; and tool.ts, with one tool per
-route. Under `tests/routes/<plural>/`: a test for each flow, a repository test, a route test and a
-tool test. It also adds the route array to `ROUTES` in `src/routes/http.ts`, adds the tools to
-`ALL_TOOLS` in `src/routes/tools.ts`, and adds the new tool names to the exact list in
+route. Under `tests/routes/<plural>/`: a test for each flow, on a fake store. Under
+`tests/integration/routes/<plural>/`: a repository test, a route test and a tool test, each on a
+scratch Postgres database. It also adds the route array to `ROUTES` in `src/routes/http.ts`, adds
+the tools to `ALL_TOOLS` in `src/routes/tools.ts`, and adds the new tool names to the exact list in
 `tests/mcp/all-tools.test.ts`.
 
-**Run after.** Run
-`bun run typecheck && bun run typecheck:pg && bun run lint && bun test && bun run test:db`. A green
-`bun test` that skips the Postgres tests has not run them. The line that `bun run test:db` prints
-names each suite it left out.
+**Run after.** Run `bun run typecheck && bun run typecheck:pg && bun run lint && bun test`, then
+`bun run db:up && bun run test:integration`. `bun test` leaves `tests/integration/` out, so a green
+`bun test` has not run the repository, route and tool tests.
 
 **Example.** The `notes` table already exists, from `/db add notes`. Run `/be create-route note`.
 The answers are: the plural is `notes`; there is no parent; the methods are `get` and `create`;

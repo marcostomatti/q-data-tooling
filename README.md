@@ -106,6 +106,19 @@ bun test
 bun run privacy                 # add `-- --no-gitleaks` when gitleaks is not installed
 ```
 
+`bun test` needs no database, and CI runs it the same way. The tests that read or write one are
+the integration tests, under `tests/integration/`. They run on Postgres, each file on a scratch
+database it creates and drops, so your data is never touched. Run them on your machine after a
+change that touches the database:
+
+```sh
+bun run db:up && bun run test:integration
+```
+
+`bun test` reads `.env.test` over `.env` by itself. That file only points `DATABASE_URL` at the
+test server, and every other variable keeps its `.env` value
+([the integration tests](docs/setup.md#the-integration-tests)).
+
 ## Read next
 
 How the code is laid out, one layer per page, with diagrams and examples:
@@ -129,7 +142,7 @@ The template's pages, each covering one part:
 - [Skills](docs/skills.md): the project skills that generate a route, a page, a table or a
   migration.
 - [Database](docs/database.md): the two dialects, Postgres for this project and SQLite for the
-  tests, migrations and seeds.
+  template, migrations and seeds.
 - [Auth](docs/auth.md): sign-in with a password or OpenID Connect, API keys and API tokens.
 - [Backup](docs/backup.md): scheduled dumps, `bun run backup` and restoring a dump.
 - [MCP](docs/mcp.md): the service's tools for an agent, over stdio or HTTP.

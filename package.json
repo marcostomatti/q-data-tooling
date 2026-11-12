@@ -56,8 +56,7 @@
     "docs:openapi": "bun scripts/export-openapi.ts",
     "typecheck": "tsc --noEmit -p .",
     "typecheck:pg": "tsc --noEmit -p tsconfig.pg.json",
-    "test:integration": "bun test tests/integration tests/contract",
-    "test:db": "bun scripts/test-db.ts",
+    "test:integration": "bun test --path-ignore-patterns= tests/integration",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "privacy": "bun scripts/privacy-check.ts ."

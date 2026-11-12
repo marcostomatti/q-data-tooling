@@ -18,6 +18,8 @@ import { and, asc, count, desc, eq, inArray, lt, max, notInArray, type AnyColumn
 import { bucketOf, NAMED_FORMS, OTHER_FORMS } from '../../entities/filing.ts';
 import { companies, filings, transact } from '../active.ts';
 
+import { nameOrder } from './companies.ts';
+
 /** The filters, the order and the window of one company's filings. */
 export interface FilingPageFilter {
   /** The CIK of the company whose filings to read. */
@@ -332,7 +334,7 @@ export async function summarizeSelectedFilings(db: Db, filter: FilingSummaryFilt
   })
     .from(companies)
     .where(selected)
-    .orderBy(asc(companies.name), asc(companies.cik))
+    .orderBy(asc(nameOrder(companies.name)), asc(companies.name), asc(companies.cik))
     .limit(filter.limit)
     .offset(filter.offset);
   const [counted] = await db.select({ total: count() }).from(companies)

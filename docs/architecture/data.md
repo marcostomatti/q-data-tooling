@@ -90,10 +90,17 @@ Postgres:
 
 Postgres, run in Docker, is this project's required database. `bun run db:up` starts it from
 `docker-compose.yaml`, and the client in `src/data/pg/client.ts` refuses to open without a
-`DATABASE_URL`. SQLite stays in the tree for two reasons: the template supports both dialects,
-and the unit tests open SQLite in memory through `tests/support/sqlite-db.ts`, so they need no
-server. The Postgres suites run only when `TEST_PG_URL` names a server, through
-`tests/support/pg-db.ts`.
+`DATABASE_URL`. SQLite stays in the tree because the template supports both dialects, and
+nothing in this project loads it. The tests that need a database run on Postgres too: each test
+file gets a scratch database from `tests/support/test-db.ts` (see
+[the integration tests](../setup.md#the-integration-tests)).
+
+`#db` is an import alias, and not a value in `.env`, because the type checker needs the dialect
+too. Drizzle gives a Postgres table and a SQLite table different types, and a query typed for
+one does not compile against the other. `package.json` is the one file that both Bun and `tsc`
+read before any code runs, so the alias hands every repository one dialect's types. A value in
+`.env` is read only while the code runs, which is too late for the types. `drizzle.config.ts`
+cannot pick it either: only drizzle-kit reads that file, and it takes its dialect from `#db`.
 
 | | Postgres (active) | SQLite |
 | --- | --- | --- |
@@ -101,7 +108,7 @@ server. The Postgres suites run only when `TEST_PG_URL` names a server, through
 | Driver | postgres-js, a pool opened from `DATABASE_URL` | `bun:sqlite`, a file or `:memory:` |
 | Started by | `bun run db:up`, in Docker | nothing; `bun run db:migrate` creates the file |
 | Foreign keys | enforced | declared, not enforced |
-| Used for | the service | the template's other build, and the in-memory unit tests |
+| Used for | the service and the integration tests | the template's other build |
 
 Each dialect folder's `index.ts` exports the same names: `DIALECT`, the client (`getDb`,
 `closeDb`), `transact`, `dbDependency` and the tables. `src/data/active.ts` is the one module

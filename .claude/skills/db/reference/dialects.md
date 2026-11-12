@@ -28,7 +28,8 @@ default, or `./src/data/pg/index.ts`. That one line decides five things:
    `bun run db:migrate`. On an empty container it logs `"applied":N` with N the count of every
    migration in `drizzle/pg/`.
 4. Run `bun run db:status`. Every line should read `applied`, and it should exit 0.
-5. Run the checks in the next section, with `TEST_PG_URL` naming the same server.
+5. Run the checks in the next section. `.env.test` points `DATABASE_URL` at the same server, and
+   the integration tests make their scratch databases there.
 
 ## Switch back to SQLite
 
@@ -48,10 +49,12 @@ undone.
 
 ## Checks after a switch
 
-Run `bun run typecheck && bun run typecheck:pg && bun run lint && bun test`, then `bun run test:db`.
-`test:db` reads the active dialect from `#db` and runs the Postgres suites only when `TEST_PG_URL`
-names a server that answers. It prints a line for each suite it leaves out, and a skipped
-Postgres block under `bun test` is not a pass.
+Run `bun run typecheck && bun run typecheck:pg && bun run lint && bun test`, then
+`bun run test:integration`. `bun test` needs no database, because `bunfig.toml` leaves
+`tests/integration/` out. The integration tests always run on Postgres, whichever dialect `#db`
+names: each file makes a scratch database with `openTestDatabase` from `tests/support/test-db.ts`
+on the server `.env.test` names, so they need `bun run db:up` first, and they fail when the
+server is down.
 
 ## Schema changes while the other dialect is active
 

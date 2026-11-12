@@ -337,8 +337,8 @@ builds the flow's `deps`, binds the domain on the log, and returns what the flow
 
 **Answer.** A value comes back as `{ success: true, data }`, with `null` for a flow that returns
 nothing. The handler does not parse that value against the output schema at run time. The output
-schema documents the answer in the API docs, and `tests/routes/stub-outputs.test.ts` checks that
-the flow, the tool and the route each answer something it accepts.
+schema documents the answer in the API docs, and `tests/integration/routes/stub-outputs.test.ts`
+checks that the flow, the tool and the route each answer something it accepts.
 
 ### The error envelope
 
@@ -482,14 +482,20 @@ rule.
 ## Tests for each piece
 
 Each route folder has a test folder of the same name, `tests/routes/<name>/`, and
-`tests/routes/info/` sets the pattern:
+`tests/routes/info/` sets the pattern. A test that reads or writes the database goes under
+`tests/integration/routes/<name>/` instead, so `bun test` and CI run without one, and
+`bun run test:integration` runs it on a scratch Postgres database:
 
 | Test | Runs through | Checks |
 | --- | --- | --- |
 | `<verb>.flow.test.ts` | The flow, with fake stores and `captureLog()` | The work and its log lines, with no database |
 | `http.test.ts` | `startTestServer` from `tests/http/harness.ts` | Status codes, the envelope, the `DOMAIN` on the flow's line |
 | `tool.test.ts` | `connectTools` from `tests/support/tool-harness.ts` | The same call over a real MCP client and server |
-| `repository.test.ts` | A seeded SQLite test database | The stores over real queries |
+| `repository.test.ts` | A seeded scratch database from `tests/support/test-db.ts` | The stores over real queries |
+
+The info route reads no table, so all its tests stay under `tests/routes/info/`. The companies
+and filings routes split theirs: the route table and the refusals stay there, and the calls that
+read stored rows are under `tests/integration/routes/`.
 
 The filings sync tests use `fake-sync.ts` in `tests/routes/filings/`, an SEC client and stores
 that record every call with no database. A few tests read the lists themselves, so a new route is
@@ -498,8 +504,8 @@ covered as soon as it is listed:
 - `tests/http/routes.test.ts` sends every route in `ROUTES` a stray field and expects a 400.
 - `tests/http/openapi.test.ts` finds every route in `ROUTES` as one operation of the document.
 - `tests/mcp/all-tools.test.ts` checks that each route and its tool share one schema object.
-- `tests/routes/stub-outputs.test.ts` parses the companies and filings answers with their output
-  schemas.
+- `tests/integration/routes/stub-outputs.test.ts` parses the companies and filings answers with
+  their output schemas.
 
 ## Next step: add a route
 

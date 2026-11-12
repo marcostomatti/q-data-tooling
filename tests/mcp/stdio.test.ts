@@ -60,7 +60,6 @@ async function runStdioServer(secUserAgent = TEST_SEC_USER_AGENT): Promise<{ rea
       ...process.env,
       MCP_TRANSPORT: 'stdio',
       SEC_USER_AGENT: secUserAgent,
-      DATABASE_URL: ':memory:',
       OPEN_NOTEBOOK_URL: '',
       LOG_LEVEL: 'debug',
       LOG_FORMAT: 'json',

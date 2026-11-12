@@ -1,0 +1,5 @@
+# `bun test` runs the unit tests, which need no database, so CI runs them with no server.
+# The tests under tests/integration/ need the Postgres server `bun run db:up` starts, and run
+# with `bun run test:integration`, whose `--path-ignore-patterns=` clears this list.
+[test]
+pathIgnorePatterns = ["tests/integration/**"]

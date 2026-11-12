@@ -2,12 +2,13 @@ import type { DrizzleClient } from '../../../src/data/pg/client.ts';
 
 import { createServer, type AddressInfo } from 'node:net';
 
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 
 import { closeDb, getDb } from '../../../src/data/pg/client.ts';
 import { POSTGRES_DEPENDENCY_NAME, postgresDependency } from '../../../src/data/pg/dependency.ts';
 import { captureLog } from '../../support/capture-log.ts';
-import { describePg, testPgUrl } from '../../support/pg-gate.ts';
+
+// The dependency against a running server is tested in tests/integration/data/pg/dependency.test.ts.
 
 const ORIGINAL_URL = process.env.DATABASE_URL;
 
@@ -83,39 +84,6 @@ describe('postgresDependency', () => {
     expect(log.records).toEqual([
       { domain: 'Db', scope: 'ping', step: 'ping', code: 'ECONNREFUSED', level: 'error', msg: 'database unreachable' },
     ]);
-    expect(getDb()).not.toBe(db);
-  });
-});
-
-describePg('postgresDependency against TEST_PG_URL', () => {
-  beforeEach(() => {
-    process.env.DATABASE_URL = testPgUrl();
-  });
-
-  test('starts on a reachable database without logging', async () => {
-    // Arrange
-    const log = captureLog();
-    const dependency = postgresDependency(getDb(), log.log);
-
-    // Act
-    await dependency.start();
-
-    // Assert
-    expect(dependency.status).toBe('running');
-    expect(log.records).toEqual([]);
-  });
-
-  test('stopping it closes the process-wide pool', async () => {
-    // Arrange
-    const db = getDb();
-    const dependency = postgresDependency(db, captureLog().log);
-    await dependency.start();
-
-    // Act
-    await dependency.stop();
-
-    // Assert
-    expect(dependency.status).toBe('stopped');
     expect(getDb()).not.toBe(db);
   });
 });
