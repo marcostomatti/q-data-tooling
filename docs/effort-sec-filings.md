@@ -23,17 +23,22 @@ output or a tool result and last 15 minutes or less. Waiting time is the sum of 
 in a human message, an answer to a question or a plan approval. The overnight gap is left out of
 both.
 
-| Session | Tool | Wall (min) | Agent working (min) | Waiting on the human (min) | Human prompts | Output tokens |
-|---|---|---:|---:|---:|---:|---:|
-| Setup and design | VS Code | 161 | 21 | 132 | 6, plus 3 interrupts and 5 answers | 243k |
-| Spec repair and loop prep | CCD | 147 | 31 | 109 | 12, plus 1 interrupt and 1 answer | 343k |
-| `rafa plan create` | rafa | 3 | 3 | 0 | 0 | 52k |
-| Loop: 56 tasks, wrap-up, CI repair | rafa | 150 | 140 | 0 | 0 | 1.55M |
-| Patching and fine tuning | CCD | 351 awake, 785 with the night | 192, plus 62 in 7 subagents | 180 | 15 | 2.03M |
-| **Total** | | | **387**, plus 62 in subagents | **421** | **33** | **4.2M** |
+Each session goes by a short random key in this report, in place of its real id, so the tables
+can point at one session without naming it.
 
-The CCD session that started the loop had no project work in it: it was opened to wait for the
-loop commands, which in the end ran from a terminal. It is left out of the table.
+| Session | Key | Tool | Wall (min) | Agent working (min) | Waiting on the human (min) | Human prompts | Output tokens |
+|---|---|---|---:|---:|---:|---:|---:|
+| Setup and design | `steady-lovelace-b0d5af` | VS Code | 161 | 21 | 132 | 6, plus 3 interrupts and 5 answers | 243k |
+| Spec repair and loop prep | `quiet-noether-d03392` | CCD | 147 | 31 | 109 | 12, plus 1 interrupt and 1 answer | 343k |
+| `rafa plan create` | `brisk-turing-1ccc06` | rafa | 3 | 3 | 0 | 0 | 52k |
+| Loop: 56 tasks, wrap-up, CI repair | `patient-hopper-99144f` | rafa | 150 | 140 | 0 | 0 | 1.55M |
+| Patching and fine tuning | `bold-curie-2c9638` | CCD | 351 awake, 785 with the night | 192, plus 62 in 7 subagents | 180 | 15 | 2.03M |
+| **Total** | | | | **387**, plus 62 in subagents | **421** | **33** | **4.2M** |
+
+The loop key stands for its 58 sessions together: one per task, the wrap-up and the CI repair.
+The CCD session that started the loop (`idle-babbage-3c32f9`) had no project work in it: it was
+opened to wait for the loop commands, which in the end ran from a terminal. It is left out of the
+table.
 
 The patching session ran out of context 6 times, and each time it went on from a summary of
 itself. The loop's sessions start fresh per task, so none of them did.
@@ -101,7 +106,8 @@ The 15-minute gaps, longest first:
 | 11-11 20:27 | 11-11 21:08 | 41 | 32 | First UI pass |
 
 Agent idle time is the time a session sat waiting for the human, overnight left out: 132 minutes
-in the VS Code session, 109 in the spec repair session and 180 in the patching session, 421 in all.
+in `steady-lovelace-b0d5af`, 109 in `quiet-noether-d03392` and 180 in `bold-curie-2c9638`, 421 in
+all.
 The loop never waited: each task session ended and the next one started within seconds.
 
 ## Building: the loop by stage
@@ -204,13 +210,15 @@ nor human time.
 ### Privacy
 
 This page names no session id, no local path or folder layout, no device, no person and no
-address. Sessions are named by their role, and prompts are described, never quoted. It passes
-`bun run privacy`, whose generic rules catch home folder paths, private addresses and email
-addresses.
+address. Sessions go by their role and a short random key, paths by a pseudonym, and prompts are
+described, never quoted. It passes `bun run privacy`, whose generic rules catch home folder
+paths, private addresses and email addresses.
 
 A probe of the scan with five leaks a stats page could carry found that it caught only the
-`/Users/<name>` path. Claude Code names its log folders with the same path in dashes,
-`-Users-<name>-projects-<repo>`, and the home-path rule now catches that form too
-(`scripts/privacy-check.ts`, with its test in `tests/scripts/privacy-check.test.ts`). Three
-shapes are still left to a person or a denylist: session ids, the desktop app's session links,
-and paths written from `~/`.
+slashed home path, such as `/Users/tester/projects/demo`. Claude Code names its log folders with
+the same path in dashes, such as `-Users-tester-projects-demo`, and the home-path rule now
+catches that form too (`scripts/privacy-check.ts`, with its test in
+`tests/scripts/privacy-check.test.ts`). The examples here use `tester`, a placeholder user both
+forms allow. Three shapes are still left to a person or a denylist: session ids, the desktop
+app's session links, and paths written from the home folder shortcut, such as
+`projects/demo/src`. This page replaces each of them with a key or a pseudonym.
