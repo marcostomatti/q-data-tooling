@@ -92,14 +92,23 @@ export interface BuildWebOptions {
 }
 
 /**
- * Builds the web app into `outdir`, minified, through Tailwind. Never throws
- * on a build error: the caller reads `success` and `logs` on the returned
- * output.
+ * The prefix of every chunk the built `index.html` loads. The server answers
+ * `/filings/:cik` with the same `index.html`, so a relative `./chunk.css`
+ * there would resolve to `/filings/chunk.css` and come back as HTML; named
+ * from the root, the chunks load on every page.
+ */
+const PUBLIC_PATH = '/';
+
+/**
+ * Builds the web app into `outdir`, minified, through Tailwind, with each
+ * chunk loaded from the root. Never throws on a build error: the caller reads
+ * `success` and `logs` on the returned output.
  */
 export async function buildWeb(options: BuildWebOptions): Promise<BuildOutput> {
   return Bun.build({
     entrypoints: options.entrypoints ?? [WEB_ENTRY],
     outdir: options.outdir,
+    publicPath: PUBLIC_PATH,
     minify: true,
     sourcemap: options.sourcemap ?? 'none',
     plugins: [tailwindHoistingImports],

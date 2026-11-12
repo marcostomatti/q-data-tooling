@@ -2,11 +2,12 @@ import type { CompanyPage } from '../../api.ts';
 
 import { Banner, Content, EmptyState } from '@open-tomato/components';
 
+import { pageCountOf } from '../../components/pager.tsx';
+
 import {
   COMPANIES_EMPTY_DESCRIPTION,
   COMPANIES_EMPTY_TITLE,
   COMPANIES_PAGE_SIZE,
-  pageCountOf,
 } from './logic.ts';
 import { CompanyRow, type CompanyRowHandlers } from './row.tsx';
 import { CompaniesToolbar, type CompaniesToolbarProps } from './toolbar.tsx';

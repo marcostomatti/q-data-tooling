@@ -26,6 +26,12 @@ const EVERY: Omit<FilingPageFilter, 'cik'> = { form: undefined, sort: '-filingDa
 /** Every selected company, in one window wide enough for all of them. */
 const ALL_SELECTED: FilingSummaryFilter = { form: undefined, offset: 0, limit: 100 };
 
+/** A company's counts with every bucket at 0, so a case spells only the buckets it fills. */
+const ZERO_COUNTS = { '10-K': 0, '10-Q': 0, '8-K': 0, '6-K': 0, '4': 0, '144': 0, other: 0, total: 0 };
+
+/** A company's newest filing dates with no bucket filed. */
+const NO_DATES = { '10-K': null, '10-Q': null, '8-K': null, '6-K': null, '4': null, '144': null, other: null };
+
 let db: SqliteTestClient;
 
 beforeEach(async () => {
@@ -257,6 +263,23 @@ describe('pageFilings', () => {
     expect([first.total, second.total]).toEqual([4, 4]);
   });
 
+  test('keeps a named form under its own filter and every other base form under other', async () => {
+    // Arrange
+    const formFour = filingOf(APPLE, 5, { form: '4', baseForm: '4', filingDate: '2026-05-10', items: [] });
+    const schedule = filingOf(APPLE, 6, { form: 'SCHEDULE 13G', baseForm: 'SCHEDULE 13G', filingDate: '2026-02-14', items: [] });
+    const prospectus = filingOf(APPLE, 7, { form: '424B2', baseForm: '424B2', filingDate: '2026-03-01', items: [] });
+    await insertFilings(db, [formFour, schedule, prospectus]);
+
+    // Act
+    const four = await pageFilings(db, { ...EVERY, cik: APPLE, form: '4' });
+    const other = await pageFilings(db, { ...EVERY, cik: APPLE, form: 'other' });
+
+    // Assert
+    expect(four.items.map((filing) => filing.accessionNumber)).toEqual([formFour.accessionNumber]);
+    expect(other.items.map((filing) => filing.form)).toEqual(['424B2', 'SCHEDULE 13G']);
+    expect(other.total).toBe(2);
+  });
+
   test('answers the window past the last match with no items and the real total', async () => {
     // Act / Assert
     expect(await pageFilings(db, { ...EVERY, cik: APPLE, offset: 100, limit: 25 })).toEqual({ items: [], total: 4 });
@@ -281,6 +304,10 @@ describe('summarizeSelectedFilings', () => {
       filingOf(APPLE, 5, { filingDate: '2026-06-05' }),
       filingOf(AGNICO, 6, { form: '10-Q', baseForm: '10-Q', filingDate: '2026-04-30' }),
       filingOf(WALMART, 7, { form: '10-K', baseForm: '10-K', filingDate: '2026-03-20' }),
+      filingOf(APPLE, 8, { form: '4', baseForm: '4', filingDate: '2026-06-10', items: [] }),
+      filingOf(APPLE, 9, { form: 'SCHEDULE 13G', baseForm: 'SCHEDULE 13G', filingDate: '2026-02-14', items: [] }),
+      filingOf(APPLE, 10, { form: '424B2', baseForm: '424B2', filingDate: '2026-03-01', items: [] }),
+      filingOf(AGNICO, 11, { form: '6-K', baseForm: '6-K', filingDate: '2026-05-20', items: [] }),
     ]);
   });
 
@@ -299,7 +326,8 @@ describe('summarizeSelectedFilings', () => {
         cik: AGNICO,
         ticker: 'AEM',
         name: 'AGNICO EAGLE MINES LTD',
-        counts: { '10-K': 0, '10-Q': 1, '8-K': 0, total: 1 },
+        counts: { ...ZERO_COUNTS, '10-Q': 1, '6-K': 1, total: 2 },
+        lastFiled: { ...NO_DATES, '10-Q': '2026-04-30', '6-K': '2026-05-20' },
         latest10K: null,
         filingsSyncedAt: null,
       },
@@ -307,7 +335,8 @@ describe('summarizeSelectedFilings', () => {
         cik: APPLE,
         ticker: 'AAPL',
         name: 'Apple Inc.',
-        counts: { '10-K': 2, '10-Q': 1, '8-K': 2, total: 5 },
+        counts: { ...ZERO_COUNTS, '10-K': 2, '10-Q': 1, '8-K': 2, '4': 1, other: 2, total: 8 },
+        lastFiled: { ...NO_DATES, '10-K': '2026-01-10', '10-Q': '2026-02-01', '8-K': '2026-06-05', '4': '2026-06-10', other: '2026-03-01' },
         latest10K: { filingDate: '2026-01-10', links: APPLE_LATEST_10K.links },
         filingsSyncedAt: new Date(1_785_000_000 * 1000).toISOString(),
       },
@@ -315,7 +344,7 @@ describe('summarizeSelectedFilings', () => {
     for (const summary of page.items) expect(CompanySummary.parse(summary)).toEqual(summary);
   });
 
-  test('narrows the counts to one form and keeps every selected company and the latest 10-K', async () => {
+  test('narrows the counts and last filing dates to one form and keeps every selected company and the latest 10-K', async () => {
     // Arrange
     selectWithSql(APPLE, AGNICO);
 
@@ -325,10 +354,23 @@ describe('summarizeSelectedFilings', () => {
     // Assert
     expect(page.total).toBe(2);
     expect(page.items.map((summary) => [summary.cik, summary.counts])).toEqual([
-      [AGNICO, { '10-K': 0, '10-Q': 0, '8-K': 0, total: 0 }],
-      [APPLE, { '10-K': 0, '10-Q': 0, '8-K': 2, total: 2 }],
+      [AGNICO, ZERO_COUNTS],
+      [APPLE, { ...ZERO_COUNTS, '8-K': 2, total: 2 }],
     ]);
     expect(page.items[1]?.latest10K?.filingDate).toBe('2026-01-10');
+    expect(page.items[1]?.lastFiled).toEqual({ ...NO_DATES, '8-K': '2026-06-05' });
+  });
+
+  test('narrows to other: every base form outside the named ones, in one bucket', async () => {
+    // Arrange
+    selectWithSql(APPLE);
+
+    // Act
+    const page = await summarizeSelectedFilings(db, { ...ALL_SELECTED, form: 'other' });
+
+    // Assert
+    expect(page.items[0]?.counts).toEqual({ ...ZERO_COUNTS, other: 2, total: 2 });
+    expect(page.items[0]?.lastFiled).toEqual({ ...NO_DATES, other: '2026-03-01' });
   });
 
   test('answers a selected company with no filings with zero counts and no latest 10-K', async () => {
@@ -342,7 +384,8 @@ describe('summarizeSelectedFilings', () => {
         cik: AGNICO,
         ticker: 'AEM',
         name: 'AGNICO EAGLE MINES LTD',
-        counts: { '10-K': 0, '10-Q': 0, '8-K': 0, total: 0 },
+        counts: ZERO_COUNTS,
+        lastFiled: NO_DATES,
         latest10K: null,
         filingsSyncedAt: null,
       }],

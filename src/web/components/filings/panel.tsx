@@ -56,7 +56,7 @@ export interface FilingsPanelProps extends FilingsLayoutToggleProps {
 /**
  * What the drawer and the modal both hold: the layout toggle in a header row, an alert when the
  * load failed, a loading line before the answer, the {@link LatestTenKCard} only when the company
- * filed a 10-K, and the library's `EmptyState` when it filed none of the tracked forms. In the
+ * filed a 10-K, and the library's `EmptyState` when it filed nothing in the last year. In the
  * drawer layout the {@link FilingsAccordion} follows, and in the modal layout the
  * {@link FilingsGrid}, once there are filings. Pure: it holds no state and calls no API.
  *

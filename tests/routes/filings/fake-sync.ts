@@ -53,7 +53,8 @@ function row(fields: Partial<RawRow>): RawRow {
 
 /**
  * Six rows: a 10-K, a 10-K/A and an 8-K of the last year, an 8-K filed on the cutoff, a Form 4
- * of the last year, and a 10-Q filed the day before the cutoff. A sync keeps the first four.
+ * of the last year, and a 10-Q filed the day before the cutoff. A sync keeps every form of the
+ * last year, so the first five.
  */
 export const ROWS: readonly RawRow[] = [
   row({ accessionNumber: '0000320193-26-000026', filingDate: '2026-11-03', form: '10-K', items: '', primaryDocument: 'aapl-20260926.htm', primaryDocDescription: '10-K' }),
@@ -65,7 +66,7 @@ export const ROWS: readonly RawRow[] = [
 ];
 
 /** The accession numbers a sync of {@link ROWS} at `NOW` stores, in EDGAR's order. */
-export const KEPT_ACCESSIONS: readonly string[] = ROWS.slice(0, 4).map((r) => r.accessionNumber);
+export const KEPT_ACCESSIONS: readonly string[] = ROWS.slice(0, 5).map((r) => r.accessionNumber);
 
 /**
  * Turns rows into EDGAR's column arrays, the shape `filings.recent` holds.

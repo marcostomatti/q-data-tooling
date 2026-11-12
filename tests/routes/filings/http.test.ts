@@ -80,8 +80,14 @@ describe('GET /api/companies/:ticker/filings', () => {
     expect(outcome.body).toMatchObject({ success: false, error: { name: 'NotFoundError' } });
   });
 
-  test('refuses a form it does not track with a 400 led by its path', async () => {
-    const outcome = await server.request('GET', '/api/companies/AAPL/filings?form=4');
+  test('reads form=other from the query string, the bucket of every form it does not name', async () => {
+    const outcome = await server.request('GET', '/api/companies/AAPL/filings?form=other');
+    expect(outcome.status).toBe(200);
+    expect(outcome.body).toMatchObject({ success: true, data: { filings: { items: [], total: 0 } } });
+  });
+
+  test('refuses a form outside the buckets, such as S-1, with a 400 led by its path', async () => {
+    const outcome = await server.request('GET', '/api/companies/AAPL/filings?form=S-1');
     expect(outcome.status).toBe(400);
     expect(outcome.body).toMatchObject({ success: false, error: { name: 'ValidationError', message: expect.stringMatching(/^form: /) } });
   });
@@ -115,7 +121,8 @@ describe('GET /api/filings/summary', () => {
           cik: APPLE_CIK,
           ticker: 'AAPL',
           name: 'Apple Inc.',
-          counts: { '10-K': 1, '10-Q': 0, '8-K': 0, total: 1 },
+          counts: { '10-K': 1, '10-Q': 0, '8-K': 0, '6-K': 0, '4': 0, '144': 0, other: 0, total: 1 },
+          lastFiled: { '10-K': '2026-11-03', '10-Q': null, '8-K': null, '6-K': null, '4': null, '144': null, other: null },
           latest10K: { filingDate: '2026-11-03', links: APPLE_10K.links },
           filingsSyncedAt: null,
         }],

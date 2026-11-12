@@ -8,11 +8,12 @@ export const DOMAIN = 'Companies';
 
 /**
  * The input of `company_list`, `GET /companies`: the paging fields, `q` to match a ticker
- * prefix or a name it contains, 1 to 100 characters once trimmed, and `selected` to keep only
+ * prefix, a name it contains or, when it is digits only, a whole CIK, 1 to 100 characters once
+ * trimmed, and `selected` to keep only
  * the companies in the summary or only those out of it. Strict, so a stray field is refused.
  */
 export const CompanyListInput = PaginationQuery.extend({
-  /** A ticker prefix or a part of the name to match, 1 to 100 characters once trimmed. */
+  /** A ticker prefix, a part of the name, or a whole CIK in digits, 1 to 100 characters once trimmed. */
   q: z.string().trim()
     .min(1)
     .max(100)

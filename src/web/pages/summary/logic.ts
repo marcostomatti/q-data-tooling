@@ -1,4 +1,7 @@
+import type { FormBucket } from '../../../entities/filing.ts';
 import type { Company, CompanySummary, SummaryPage } from '../../api.ts';
+
+import { FORM_BUCKETS } from '../../components/filings/logic.ts';
 
 /** The Summary page's nav label, which the shell's topbar shows as the page's title. */
 export const SUMMARY_TITLE = 'Summary';
@@ -33,6 +36,12 @@ export const LATEST_FILING_TITLE = 'Latest 10-K';
 /** What the latest-filing card shows when no selected company filed a 10-K in the last year. */
 export const NO_LATEST_FILING = '—';
 
+/** The title of the stat card naming the selected company with the most filings in the last year. */
+export const MOST_FILINGS_TITLE = 'Most filings';
+
+/** The title of the stat card holding the newest filing of any form across the selected companies. */
+export const NEWEST_FILING_TITLE = 'Newest filing';
+
 /**
  * The companies the page asks for in one call: the route's largest page size, `PAGE_SIZE_MAX`
  * in `src/routes/common.ts`, repeated here so the bundle does not carry zod for it.
@@ -47,14 +56,56 @@ export interface LatestFiling {
   readonly filingDate: string
 }
 
+/** The newest filing of any form: the company that filed it, its date and its bucket. */
+export interface NewestFiling extends LatestFiling {
+  /** The bucket the filing counts under, such as `4` or `other`. */
+  readonly form: FormBucket
+}
+
+/** The selected company with the most filings in the last year, and that count. */
+export interface BusiestCompany {
+  /** The company's ticker. */
+  readonly ticker: string
+  /** Its filings in the last year, every form. */
+  readonly total: number
+}
+
 /** The figures of the Summary page's stat cards. */
 export interface SummaryStats {
-  /** The filings of every selected company in the last year, every tracked form. */
+  /** The filings of every selected company in the last year, every form. */
   readonly totalFilings: number
   /** {@link SummaryStats.totalFilings} over the count of companies, to one decimal; 0 with none. */
   readonly averagePerCompany: number
+  /** The company with the most filings, or `undefined` when none filed anything. */
+  readonly busiest: BusiestCompany | undefined
+  /** The newest filing of any form, or `undefined` when none filed anything. */
+  readonly newest: NewestFiling | undefined
   /** The latest 10-K, or `undefined` when no company filed one in the last year. */
   readonly latest: LatestFiling | undefined
+}
+
+/** The busier of two: a tie keeps the company listed first, and a company with no filings is never the busiest. */
+function busierOf(busiest: BusiestCompany | undefined, company: CompanySummary): BusiestCompany | undefined {
+  const total = company.counts.total;
+  if (total === 0 || (busiest !== undefined && busiest.total >= total)) return busiest;
+  return { ticker: company.ticker, total };
+}
+
+/** The company's newest filing date per bucket, one entry per bucket it filed in. */
+function newestPerBucket(company: CompanySummary): readonly NewestFiling[] {
+  return FORM_BUCKETS.flatMap((form) => {
+    const filingDate = company.lastFiled[form];
+    return filingDate === null
+      ? []
+      : [{ ticker: company.ticker, filingDate, form }];
+  });
+}
+
+/** The newer of two filings; a tie keeps the one met first. */
+function newerOf(newest: NewestFiling | undefined, filing: NewestFiling): NewestFiling {
+  return newest !== undefined && newest.filingDate >= filing.filingDate
+    ? newest
+    : filing;
 }
 
 function laterOf(latest: LatestFiling | undefined, company: CompanySummary): LatestFiling | undefined {
@@ -66,19 +117,24 @@ function laterOf(latest: LatestFiling | undefined, company: CompanySummary): Lat
 }
 
 /**
- * The stat cards' figures over the companies of the summary. Filing dates are `YYYY-MM-DD`, so
- * the latest is the greatest string; a tie keeps the company listed first.
+ * The stat cards' figures over the companies of the summary, read from the counts and dates the
+ * summary already carries, so no filing is opened. Filing dates are `YYYY-MM-DD`, so the latest
+ * is the greatest string; a tie keeps the company listed first, and within one company the
+ * bucket listed first in `FORM_BUCKETS`.
  *
  * @param companies - The selected companies' summaries.
- * @returns The total, the average per company and the latest 10-K.
+ * @returns The total, the average per company, the busiest company, the newest filing of any
+ *   form and the latest 10-K.
  */
 export function summaryStats(companies: readonly CompanySummary[]): SummaryStats {
   const totalFilings = companies.reduce((sum, company) => sum + company.counts.total, 0);
   const averagePerCompany = companies.length === 0
     ? 0
     : Math.round((totalFilings / companies.length) * 10) / 10;
+  const busiest = companies.reduce<BusiestCompany | undefined>(busierOf, undefined);
+  const newest = companies.flatMap(newestPerBucket).reduce<NewestFiling | undefined>(newerOf, undefined);
   const latest = companies.reduce<LatestFiling | undefined>(laterOf, undefined);
-  return { totalFilings, averagePerCompany, latest };
+  return { totalFilings, averagePerCompany, busiest, newest, latest };
 }
 
 /**

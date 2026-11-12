@@ -62,11 +62,11 @@ clean database exits 0.
 With `SEC_USER_AGENT` set in `.env`, write an API key into it, then start the server:
 
 ```sh
-bun run setApiKey --burn-after-reading
+bun run set-api-key --burn-after-reading
 bun run serve
 ```
 
-`setApiKey --burn-after-reading` generates the key, which you do not choose, saves it as
+`set-api-key --burn-after-reading` generates the key, which you do not choose, saves it as
 `API_KEY` in `.env`, and shows it once. The screen clears after 30 seconds, and `cat .env`
 shows the key again.
 
@@ -127,7 +127,7 @@ ignores the file. Two notes apply to the whole table:
 | `DB_PORT` | `5432` | The host port the Docker Postgres listens on. Set it, and the same port in `DATABASE_URL`, when 5432 is taken. | `docker-compose.yaml` |
 | `PG_DUMP_BIN` | unset, `pg_dump` from `PATH` | The `pg_dump` the Postgres backup runs, read at each dump. `scripts/pg_dump-docker.sh` runs the container's copy. | `src/backup/pg-dump.ts` |
 | `TEST_PG_URL` | unset | A Postgres URL for the tests that need a server. The Postgres suites are skipped when it is unset. Point it at a test database. | `scripts/test-db.ts`, `tests/data/migrate.test.ts` |
-| `API_KEY` | unset | The key that opens `/api` for a client. `bun run setApiKey` writes it. With neither `API_KEY` nor `AUTH_MODE`, the service refuses to start. | `src/http/server.ts`, `src/auth/access.ts`, `src/auth/set-api-key.ts` |
+| `API_KEY` | unset | The key that opens `/api` for a client. `bun run set-api-key` writes it. With neither `API_KEY` nor `AUTH_MODE`, the service refuses to start. | `src/http/server.ts`, `src/auth/access.ts`, `src/auth/set-api-key.ts` |
 | `SEC_USER_AGENT` | unset, required | The User-Agent sent with every request to SEC, as `"<app name> <contact email>"`. SEC answers 403 to a request without one, so `serve` and the MCP server refuse to start when it is unset, blank, holds no contact email or holds a line break. | `src/sec/config.ts`, `src/http/server.ts`, `src/mcp/server.ts` |
 | `AUTH_MODE` | unset, no sign-in | `password` or `oidc`, one at a time. Any other value stops the start. | `src/auth/config.ts`, `src/auth/set-password.ts` |
 | `AUTH_PASSWORD_HASH` | unset | The scrypt hash of the one password, for `AUTH_MODE=password`. `bun run set-password` writes it. A plain password is refused. | `src/auth/config.ts`, `src/auth/reset-credentials.ts` |
@@ -171,9 +171,10 @@ Every script in `package.json`, in the order the file lists them. Run one with `
 | `db:migrate` | `bun src/data/migrate.ts` | Applies the active dialect's pending migrations to `DATABASE_URL`. |
 | `db:status` | `bun src/data/migration-status.ts` | Compares the migration files with the journal rows. Exits 1 on a skipped or unknown one. |
 | `db:seed` | `bun src/data/seed.ts` | Runs the seed files in name order, one transaction each. `01-companies.ts` loads the SEC ticker list. |
-| `setApiKey` | `bun src/auth/set-api-key.ts` | Generates `API_KEY`. With `--burn-after-reading`, saves it to `.env` and shows it once. |
+| `set-api-key` | `bun src/auth/set-api-key.ts` | Generates `API_KEY`. With `--burn-after-reading`, saves it to `.env` and shows it once. |
 | `mcp` | `bun src/mcp/server.ts` | Starts the MCP server: stdio by default, HTTP when `MCP_TRANSPORT=http`. |
-| `serve` | `bun src/http/server.ts` | Starts the HTTP service on `PORT`, default 3000, with the web app when it is built. |
+| `serve` | `bun run build:web && bun src/http/server.ts` | Builds the web app, then starts the HTTP service on `PORT`, default 3000. |
+| `dev` | `bun scripts/dev.ts` | Like `serve`, with live code: restarts the service on a backend change and rebuilds the web app on a change under `src/`. Reload the page to see it. |
 | `backup` | `bun src/backup/schedule.ts --once` | Writes one backup into `backups/` and removes the older ones beyond `keep`. |
 | `set-password` | `bun src/auth/set-password.ts` | Asks for the password twice and writes its hash to `AUTH_PASSWORD_HASH` in `.env`. |
 | `reset-credentials` | `bun src/auth/reset-credentials.ts` | Signs out every browser, deletes every API token and removes `AUTH_PASSWORD_HASH`. |

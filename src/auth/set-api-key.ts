@@ -296,7 +296,7 @@ export function createRealIo(envPath: string): MainIo {
 }
 
 const USAGE = [
-  'Usage: bun run setApiKey --burn-after-reading',
+  'Usage: bun run set-api-key --burn-after-reading',
   '',
   'Generates an API key, saves it as API_KEY in .env, shows it once, then clears the screen.',
   `The ${BURN_FLAG} flag is required: without it the key would stay in the scrollback.`,

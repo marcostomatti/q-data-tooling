@@ -80,7 +80,7 @@ describe('syncFilings', () => {
     expect(calls[0]).toEqual({ call: 'getSubmissions', cik10: '0000320193' });
   });
 
-  test('stores the tracked forms of the last year only, amendments and the cutoff day included', async () => {
+  test('stores every form of the last year, a Form 4, amendments and the cutoff day included', async () => {
     const { sources, calls } = fakeSyncSources({ company: apple() });
 
     await syncFilings(apple(), { ...sources, log: captureLog().log });
@@ -96,6 +96,7 @@ describe('syncFilings', () => {
       ['10-K/A', '10-K', true],
       ['8-K', '8-K', false],
       ['8-K', '8-K', false],
+      ['4', '4', false],
     ]);
     for (const filing of rows) {
       expect(Filing.safeParse(filing).success).toBe(true);
@@ -214,7 +215,7 @@ describe('syncFilings', () => {
     await syncFilings(apple(), { ...sources, log: inDomain(captured.log, 'Filings') });
 
     expect(captured.records).toEqual([
-      { domain: 'Filings', scope: 'sync', step: 'write', ticker: 'AAPL', cik: 320193, kept: 4, inserted: 4, deleted: 0, level: 'info', msg: 'filings synced' },
+      { domain: 'Filings', scope: 'sync', step: 'write', ticker: 'AAPL', cik: 320193, kept: 5, inserted: 5, deleted: 0, level: 'info', msg: 'filings synced' },
     ]);
   });
 });

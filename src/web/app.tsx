@@ -1,5 +1,5 @@
 
-import type { IconName } from '@open-tomato/components';
+import type { IconName, ThemeName } from '@open-tomato/components';
 
 import {
   AppShell,
@@ -8,23 +8,28 @@ import {
   AppShellMain,
   AppShellSidebar,
   AppShellTitle,
-  AppShellTopbar,
   Banner,
   Button,
   Monogram,
   SidebarNav,
+  ThemeSwitcher,
 } from '@open-tomato/components';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import { APP } from '../app-config.ts';
 
 import { auth, messageOf, type SessionState } from './api.ts';
+import { CompanySearch } from './components/company-search/index.tsx';
+import { Topbar } from './components/ports/topbar.tsx';
 import { CompaniesPage } from './pages/companies/index.tsx';
 import { COMPANIES_TITLE } from './pages/companies/logic.ts';
+import { FilingsPage } from './pages/filings/index.tsx';
+import { cikFromPath, FILINGS_PATH, FILINGS_TITLE, filingsPathOf } from './pages/filings/logic.ts';
 import { LoginPage } from './pages/login.tsx';
 import { SummaryPage } from './pages/summary/index.tsx';
 import { TokensPage } from './pages/tokens.tsx';
 import { navigate, usePath } from './router.ts';
+import { useTheme } from './theme.ts';
 
 /** One page the signed-in app shows, and its place in the nav. */
 export interface AppPage {
@@ -32,7 +37,8 @@ export interface AppPage {
   readonly label: string
   /** The nav entry's icon, by its Lucide name. */
   readonly icon: IconName
-  readonly render: () => ReactNode
+  /** Draws the page for the browser's path, which may run past `path`, as `/filings/320193` does. */
+  readonly render: (path: string) => ReactNode
 }
 
 /**
@@ -41,15 +47,37 @@ export interface AppPage {
  */
 export const PAGES: readonly AppPage[] = [
   { path: APP.landing.path, label: APP.landing.label, icon: 'chart-column-stacked', render: () => <SummaryPage /> },
+  {
+    path: FILINGS_PATH,
+    label: FILINGS_TITLE,
+    icon: 'file-text',
+    // One page per CIK, so a new company starts on its first page with no filter.
+    render: (path) => {
+      const cik = cikFromPath(path);
+      return <FilingsPage key={cik ?? 'none'} cik={cik} />;
+    },
+  },
   { path: '/companies', label: COMPANIES_TITLE, icon: 'building-2', render: () => <CompaniesPage /> },
   { path: '/tokens', label: 'Tokens', icon: 'key-round', render: () => <TokensPage /> },
 ];
+
+/**
+ * Whether the page draws the path: its own path, or a path under it, as `/filings/320193` is
+ * under `/filings`. `/filingsx` is under no page.
+ *
+ * @param page - The page.
+ * @param path - The browser's path.
+ * @returns `true` when the page draws the path.
+ */
+export function drawsPath(page: AppPage, path: string): boolean {
+  return path === page.path || path.startsWith(`${page.path}/`);
+}
 
 /** The page for a path, or the first page for `/` and for any path the app does not draw. */
 export function pageFor(path: string): AppPage {
   const first = PAGES[0];
   if (!first) throw new Error('the app has no pages');
-  return PAGES.find((page) => page.path === path) ?? first;
+  return PAGES.find((page) => drawsPath(page, path)) ?? first;
 }
 
 /** The props of {@link Shell}: the page on show, its content, and the actions the frame offers. */
@@ -60,6 +88,10 @@ export interface ShellProps {
   readonly onSignOut: () => void
   /** Moves to a page by its path. Defaults to a history push the app's router listens for. */
   readonly onNavigate?: (path: string) => void
+  /** The theme on show, which the topbar switch offers to flip. Light when unset. */
+  readonly theme?: ThemeName
+  /** Shows the theme the switch picked; the caller stores it. */
+  readonly onThemeChange?: (next: ThemeName) => void
   /** The rendered page. */
   readonly children: ReactNode
 }
@@ -67,12 +99,14 @@ export interface ShellProps {
 /**
  * The signed-in frame, composed as the library's default `AppShell` story: a collapsible rail
  * holding the brand from `APP.name` and the nav built from {@link PAGES}, and beside it a topbar
- * with the collapse toggle, the current page's label as the screen's one `h1`, and a sign-out
- * button over the page. Every part is a library export styled by its own variants; the shell
- * passes no class string. The frame fills the viewport (`viewport`), so the stylesheet sizes no
+ * with the collapse toggle, the current page's label as the screen's one `h1`, the company
+ * search, which opens a company's filings, the theme switch and a sign-out button over the page.
+ * Every part is a library export styled by its own variants, but the topbar, the local
+ * {@link Topbar} port that lifts the band over the page so the search's list opens on top; the
+ * shell passes no class string. The frame fills the viewport (`viewport`), so the stylesheet sizes no
  * root box.
  */
-export function Shell({ current, onSignOut, onNavigate = navigate, children }: ShellProps) {
+export function Shell({ current, onSignOut, onNavigate = navigate, theme = 'light', onThemeChange, children }: ShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   return (
     <AppShell viewport>
@@ -90,15 +124,17 @@ export function Shell({ current, onSignOut, onNavigate = navigate, children }: S
         />
       </AppShellSidebar>
       <AppShellMain>
-        <AppShellTopbar
+        <Topbar
           sidebarCollapsed={collapsed}
           onToggleSidebar={() => setCollapsed((was) => !was)}
         >
           <AppShellTitle>{current.label}</AppShellTitle>
+          <CompanySearch onPick={(cik) => onNavigate(filingsPathOf(cik))} />
+          <ThemeSwitcher theme={theme} onToggle={onThemeChange} />
           <Button variant="ghost" size="sm" onClick={onSignOut}>
             Sign out
           </Button>
-        </AppShellTopbar>
+        </Topbar>
         <AppShellContent>{children}</AppShellContent>
       </AppShellMain>
     </AppShell>
@@ -108,6 +144,7 @@ export function Shell({ current, onSignOut, onNavigate = navigate, children }: S
 /** Asks the server whether this browser is signed in, then shows the login page or the app. */
 export function App() {
   const path = usePath();
+  const [theme, setTheme] = useTheme();
   const [session, setSession] = useState<SessionState | undefined>();
   const [error, setError] = useState<string | undefined>();
 
@@ -152,10 +189,12 @@ export function App() {
   }
 
   const current = pageFor(path);
-  if (path !== current.path) window.history.replaceState(null, '', current.path);
+  if (!drawsPath(current, path)) window.history.replaceState(null, '', current.path);
   return (
     <Shell
       current={current}
+      theme={theme}
+      onThemeChange={setTheme}
       onSignOut={() => {
         // Fire-and-forget from a click handler; the chain has no rejection handler of its own.
         void auth.logout().then(() => {
@@ -164,7 +203,7 @@ export function App() {
         });
       }}
     >
-      {current.render()}
+      {current.render(path)}
     </Shell>
   );
 }

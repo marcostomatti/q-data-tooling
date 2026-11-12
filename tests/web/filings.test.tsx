@@ -7,7 +7,7 @@ import { describe, expect, test } from 'bun:test';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { TrackedForm } from '../../src/entities/filing.ts';
+import { FORM_BUCKETS as ENTITY_BUCKETS } from '../../src/entities/filing.ts';
 import { buildLinks } from '../../src/sec/parse.ts';
 import { createFilingsClient, filingsPath } from '../../src/web/api.ts';
 import {
@@ -35,8 +35,9 @@ import {
   latestTenKOf,
   latestTitleOf,
   loadFilings,
+  FORM_BUCKETS,
+  FORM_LABELS,
   noFilingsOf,
-  TRACKED_FORMS,
 } from '../../src/web/components/filings/logic.ts';
 import {
   FilingsLayoutToggle,
@@ -304,22 +305,27 @@ describe('FilingsView', () => {
 });
 
 describe('groupByForm', () => {
-  test('the view\'s forms are the tracked forms, in their order', () => {
-    expect(TRACKED_FORMS).toEqual(TrackedForm.options);
+  test('the view\'s buckets are the entity\'s, in their order', () => {
+    expect(FORM_BUCKETS).toEqual(ENTITY_BUCKETS);
   });
 
-  test('one group per tracked form, amendments under their form, order kept', () => {
+  test('one group per bucket, amendments under their form, order kept', () => {
     const amended = filingOf('10-K/A', '2025-12-01', '0000320193-25-000099');
     const groups = groupByForm([EIGHT_K, amended, TEN_Q, TEN_K]);
-    expect(groups.map((group) => group.form)).toEqual(['10-K', '10-Q', '8-K']);
+    expect(groups.map((group) => group.form)).toEqual(['10-K', '10-Q', '8-K', '6-K', '4', '144', 'other']);
     expect(groups[0]?.filings).toEqual([amended, TEN_K]);
     expect(groups[1]?.filings).toEqual([TEN_Q]);
     expect(groups[2]?.filings).toEqual([EIGHT_K]);
   });
 
-  test('a form not filed is an empty group, an untracked form is left out', () => {
+  test('a form not filed is an empty group, and a form the app does not name goes under other', () => {
     const groups = groupByForm([filingOf('S-1', '2026-01-02', '0000320193-26-000001'), TEN_Q]);
-    expect(groups.map((group) => group.filings.length)).toEqual([0, 1, 0]);
+    expect(groups.map((group) => group.filings.length)).toEqual([0, 1, 0, 0, 0, 0, 1]);
+  });
+
+  test('an empty bucket says so under its label', () => {
+    expect(noFilingsOf('4')).toBe('No Form 4 filings in the last year');
+    expect(noFilingsOf('other')).toBe('No other filings in the last year');
   });
 });
 
@@ -377,7 +383,7 @@ describe('FilingsAccordion', () => {
   });
 
   test('open groups list every filing, and an empty form says so', () => {
-    const html = renderToStaticMarkup(<FilingsAccordion filings={WITHOUT_TEN_K.filings} defaultOpen={TRACKED_FORMS} />);
+    const html = renderToStaticMarkup(<FilingsAccordion filings={WITHOUT_TEN_K.filings} defaultOpen={FORM_BUCKETS} />);
     expect(html).toContain(noFilingsOf('10-K'));
     expect(html).toContain(`href="${TEN_Q.links.document}"`);
     expect(html).toContain(`href="${EIGHT_K.links.document}"`);
@@ -395,10 +401,10 @@ describe('FilingsAccordion', () => {
 });
 
 describe('FilingsGrid', () => {
-  test('is a 3-column grid with one SectionCard per tracked form, counted', () => {
+  test('is a 3-column grid with one SectionCard per bucket, counted', () => {
     const html = renderToStaticMarkup(<FilingsGrid filings={[EIGHT_K, TEN_Q, TEN_K, OLDER_TEN_K]} />);
     expect(html).toContain('grid-cols-3');
-    expect(html.match(/<section/g)?.length).toBe(TRACKED_FORMS.length);
+    expect(html.match(/<section/g)?.length).toBe(FORM_BUCKETS.length);
     expect(html).toContain(filingCountOf(2));
     expect(html.indexOf('>10-K<')).toBeLessThan(html.indexOf('>10-Q<'));
     expect(html.indexOf('>10-Q<')).toBeLessThan(html.indexOf('>8-K<'));
@@ -441,20 +447,19 @@ describe('the filings panel as a whole, in both layouts', () => {
   const BUILT_TEN_K: Filing = { ...TEN_K, links: BUILT };
   const amp = (url: string) => url.replaceAll('&', '&amp;');
 
-  test.each(LAYOUTS)('%s: a company with no 10-K shows no latest card, yet all three groups', (layout) => {
+  test.each(LAYOUTS)('%s: a company with no 10-K shows no latest card, yet every group', (layout) => {
     const html = renderToStaticMarkup(<FilingsPanel layout={layout} result={WITHOUT_TEN_K} />);
     expect(html).not.toContain('Latest:');
     expect(html).toContain(noFilingsOf('10-K'));
   });
 
-  test.each(LAYOUTS)('%s: the groups are the three tracked forms, in order', (layout) => {
+  test.each(LAYOUTS)('%s: the groups are the buckets under their labels, in order', (layout) => {
     const html = renderToStaticMarkup(<FilingsPanel layout={layout} result={WITH_TEN_K} />);
-    const at = TRACKED_FORMS.map((form) => html.indexOf(layout === 'drawer'
-      ? `${form} (`
-      : `>${form}<`));
+    const at = FORM_BUCKETS.map((form) => html.indexOf(layout === 'drawer'
+      ? `${FORM_LABELS[form]} (`
+      : `>${FORM_LABELS[form]}<`));
     expect(at.every((index) => index >= 0)).toBe(true);
     expect([...at].sort((a, b) => a - b)).toEqual(at);
-    expect(TRACKED_FORMS).toEqual(['10-K', '10-Q', '8-K']);
   });
 
   test.each(LAYOUTS)('%s: the links carry the sec.gov URLs ingest builds', (layout) => {

@@ -5,25 +5,25 @@
  * A filing is answered as the {@link Filing} entity, its five stored link columns gathered into
  * `links`. A filing is keyed by its accession number, so writing the same filing twice keeps the
  * first copy. Forms are matched by their base form, so an amendment such as `10-K/A` counts and
- * filters under `10-K`.
+ * filters under `10-K`, and every base form outside `NamedForm` counts and filters under `other`.
  *
  * @module
  */
 
 import type { Db } from './db.ts';
-import type { Filing, FilingLinks } from '../../entities/filing.ts';
+import type { Filing, FilingLinks, FormBucket } from '../../entities/filing.ts';
 
-import { and, asc, count, desc, eq, inArray, lt, type AnyColumn, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, lt, max, notInArray, type AnyColumn, type SQL } from 'drizzle-orm';
 
-import { TrackedForm } from '../../entities/filing.ts';
+import { bucketOf, NAMED_FORMS, OTHER_FORMS } from '../../entities/filing.ts';
 import { companies, filings, transact } from '../active.ts';
 
 /** The filters, the order and the window of one company's filings. */
 export interface FilingPageFilter {
   /** The CIK of the company whose filings to read. */
   readonly cik: number
-  /** The base form to keep, amendments included, or `undefined` to keep every tracked form. */
-  readonly form: TrackedForm | undefined
+  /** The bucket to keep, amendments included, or `undefined` to keep every form. */
+  readonly form: FormBucket | undefined
   /** By filing date, oldest first (`filingDate`) or newest first (`-filingDate`). */
   readonly sort: 'filingDate' | '-filingDate'
   /** The count of matching filings to skip. */
@@ -43,27 +43,27 @@ export interface FilingPage {
 /** The form filter and the window of the summary of the selected companies. */
 export interface FilingSummaryFilter {
   /**
-   * The base form to narrow the counts to: the other forms count 0 and `total` counts this one.
-   * `undefined` counts every tracked form. It never drops a company from the summary.
+   * The bucket to narrow the counts to: the other buckets count 0 and `total` counts this one.
+   * `undefined` counts every form. It never drops a company from the summary.
    */
-  readonly form: TrackedForm | undefined
+  readonly form: FormBucket | undefined
   /** The count of selected companies to skip. */
   readonly offset: number
   /** The most companies to return. */
   readonly limit: number
 }
 
-/** A company's count of stored filings per tracked base form, amendments included, and in total. */
-export interface FilingCounts {
-  /** The count of `10-K` and `10-K/A` filings. */
-  readonly '10-K': number
-  /** The count of `10-Q` and `10-Q/A` filings. */
-  readonly '10-Q': number
-  /** The count of `8-K` and `8-K/A` filings. */
-  readonly '8-K': number
-  /** The sum of the three. */
-  readonly total: number
-}
+/**
+ * A company's count of stored filings per bucket, amendments included under their base form, so
+ * `10-K` counts `10-K` and `10-K/A`, and in `total`, the sum of every bucket.
+ */
+export type FilingCounts = Readonly<Record<FormBucket | 'total', number>>;
+
+/**
+ * The filing date of a company's newest stored filing per bucket, amendments included,
+ * `YYYY-MM-DD`, or `null` for a bucket it has none of.
+ */
+export type LastFiled = Readonly<Record<FormBucket, string | null>>;
 
 /** The filing date and the links of a company's latest stored 10-K. */
 export interface Latest10K {
@@ -81,8 +81,10 @@ export interface FilingSummary {
   readonly ticker: string
   /** The company's name as the SEC lists it. */
   readonly name: string
-  /** The company's stored filings, counted per tracked base form. */
+  /** The company's stored filings, counted per bucket. */
   readonly counts: FilingCounts
+  /** The filing date of the company's newest stored filing per bucket. */
+  readonly lastFiled: LastFiled
   /** The latest stored filing of base form `10-K`, or `null` when the company has none stored. */
   readonly latest10K: Latest10K | null
   /** When the company's filings were last synced, as an ISO datetime, or `null` before the first sync. */
@@ -109,6 +111,13 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** The base form whose latest filing the summary answers. */
 const ANNUAL_FORM = '10-K';
+
+/** The filings of one bucket: the base form itself, or every base form outside `NAMED_FORMS` for `other`. */
+function inBucket(bucket: FormBucket): SQL {
+  return bucket === OTHER_FORMS
+    ? notInArray(filings.baseForm, [...NAMED_FORMS])
+    : eq(filings.baseForm, bucket);
+}
 
 /** A `filings` row as drizzle reads it. */
 type FilingRow = typeof filings.$inferSelect;
@@ -221,7 +230,7 @@ export async function pageFilings(db: Db, filter: FilingPageFilter): Promise<Fil
     eq(filings.cik, filter.cik),
     filter.form === undefined
       ? undefined
-      : eq(filings.baseForm, filter.form),
+      : inBucket(filter.form),
   );
   const rows = await db.select().from(filings)
     .where(where)
@@ -233,18 +242,49 @@ export async function pageFilings(db: Db, filter: FilingPageFilter): Promise<Fil
   return { items: rows.map(toFiling), total: counted?.total ?? 0 };
 }
 
-/** The stored filings of the companies with `ciks`, counted per company and per base form in `forms`. */
-async function countsOf(db: Db, ciks: readonly number[], forms: readonly TrackedForm[]): Promise<Map<number, FilingCounts>> {
-  const grouped = await db.select({ cik: filings.cik, baseForm: filings.baseForm, total: count() })
+/** A company's counts and newest filing dates per bucket, read in one grouped query. */
+interface FormStats {
+  readonly counts: FilingCounts
+  readonly lastFiled: LastFiled
+}
+
+/** The stats of a company with no stored filing in the bucket asked for. */
+const NO_FORM_STATS: FormStats = {
+  counts: { '10-K': 0, '10-Q': 0, '8-K': 0, '6-K': 0, '4': 0, '144': 0, other: 0, total: 0 },
+  lastFiled: { '10-K': null, '10-Q': null, '8-K': null, '6-K': null, '4': null, '144': null, other: null },
+};
+
+/** The later of two `YYYY-MM-DD` dates, which compare as text; `null` is earlier than any date. */
+function laterDate(a: string | null, b: string | null): string | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return a >= b
+    ? a
+    : b;
+}
+
+/**
+ * The stored filings of the companies with `ciks`, counted per company and per base form, with
+ * the newest filing date of each group, then summed into their buckets: a named form is its own
+ * bucket, and every other base form adds into `other`, whose date is the newest of them. With
+ * `bucket` set, only that bucket's filings are read, so every other bucket counts 0 and has no
+ * date.
+ */
+async function formStatsOf(db: Db, ciks: readonly number[], bucket: FormBucket | undefined): Promise<Map<number, FormStats>> {
+  const grouped = await db.select({ cik: filings.cik, baseForm: filings.baseForm, total: count(), newest: max(filings.filingDate) })
     .from(filings)
-    .where(and(inArray(filings.cik, [...ciks]), inArray(filings.baseForm, [...forms])))
+    .where(and(inArray(filings.cik, [...ciks]), bucket === undefined
+      ? undefined
+      : inBucket(bucket)))
     .groupBy(filings.cik, filings.baseForm);
-  const zero: FilingCounts = { '10-K': 0, '10-Q': 0, '8-K': 0, total: 0 };
   return grouped.reduce((byCik, group) => {
-    const form = TrackedForm.parse(group.baseForm);
-    const counts = byCik.get(group.cik) ?? zero;
-    return new Map(byCik).set(group.cik, { ...counts, [form]: counts[form] + group.total, total: counts.total + group.total });
-  }, new Map<number, FilingCounts>());
+    const into = bucketOf(group.baseForm);
+    const { counts, lastFiled } = byCik.get(group.cik) ?? NO_FORM_STATS;
+    return new Map(byCik).set(group.cik, {
+      counts: { ...counts, [into]: counts[into] + group.total, total: counts.total + group.total },
+      lastFiled: { ...lastFiled, [into]: laterDate(lastFiled[into], group.newest) },
+    });
+  }, new Map<number, FormStats>());
 }
 
 /** The latest stored 10-K of each company with `ciks` that has one: by filing date, then acceptance time. */
@@ -269,12 +309,13 @@ async function latest10KOf(db: Db, ciks: readonly number[]): Promise<Map<number,
 
 /**
  * One window of the summary of the selected companies, by name then CIK, and the count of every
- * selected company. Each summary counts the company's stored filings per tracked base form,
- * amendments included, and answers its latest stored 10-K, a `10-K/A` included, or `null`.
- * A `form` narrows the counts to that form and keeps every selected company, so the total is
- * the count of selected companies with or without it; `latest10K` is its own data point and
- * ignores `form`. It reads stored rows only. The window, the count, the counts and the latest
- * 10-Ks are four reads, not one snapshot.
+ * selected company. Each summary counts the company's stored filings per bucket, amendments
+ * included, with the filing date of the newest of each bucket, and answers its latest stored
+ * 10-K, a `10-K/A` included, or `null`. A `form` narrows the counts and dates to that bucket
+ * and keeps every selected company, so the total is the count of selected companies with or
+ * without it; `latest10K` is its own data point and ignores `form`. It reads stored rows only.
+ * The window, the count, the counts with their dates and the latest 10-Ks are four reads, not
+ * one snapshot.
  *
  * @param db - The client or open transaction to read through.
  * @param filter - The form filter and the window.
@@ -299,15 +340,12 @@ export async function summarizeSelectedFilings(db: Db, filter: FilingSummaryFilt
   const total = counted?.total ?? 0;
   if (window.length === 0) return { items: [], total };
   const ciks = window.map((company) => company.cik);
-  const forms = filter.form === undefined
-    ? TrackedForm.options
-    : [filter.form];
-  const [counts, latest] = await Promise.all([countsOf(db, ciks, forms), latest10KOf(db, ciks)]);
+  const [stats, latest] = await Promise.all([formStatsOf(db, ciks, filter.form), latest10KOf(db, ciks)]);
   const items = window.map((company): FilingSummary => ({
     cik: company.cik,
     ticker: company.ticker,
     name: company.name,
-    counts: counts.get(company.cik) ?? { '10-K': 0, '10-Q': 0, '8-K': 0, total: 0 },
+    ...(stats.get(company.cik) ?? NO_FORM_STATS),
     latest10K: latest.get(company.cik) ?? null,
     filingsSyncedAt: company.filingsSyncedAt === null
       ? null

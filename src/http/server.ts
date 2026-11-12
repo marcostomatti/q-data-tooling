@@ -35,8 +35,12 @@ const RATE_LIMIT = { max: 1_000, windowMs: 60_000 } as const;
 /** Where `bun run build:web` writes the web app. */
 const DEFAULT_WEB_DIST = resolve(import.meta.dir, '../web/dist');
 
-/** The paths the web app draws itself, each answered with its `index.html`: `/` lands on `APP.landing.path`. */
-export const APP_PATHS = ['/', '/login', APP.landing.path, '/companies', '/tokens'];
+/**
+ * The paths the web app draws itself, each answered with its `index.html`: `/` lands on
+ * `APP.landing.path`, and `/filings/:cik` is one company's filings, so a reload there or a
+ * shared link opens the page on that company.
+ */
+export const APP_PATHS = ['/', '/login', APP.landing.path, '/filings', '/filings/:cik', '/companies', '/tokens'];
 
 export interface StartOptions {
   /**
@@ -65,7 +69,7 @@ export class MissingApiKeyError extends Error {
   constructor() {
     super(
       'Neither API_KEY nor AUTH_MODE is set, so nothing could open /api and the service will not start. Run ' +
-        '`bun run setApiKey --burn-after-reading` to write an API_KEY into .env, or set AUTH_MODE (see docs/auth.md).',
+        '`bun run set-api-key --burn-after-reading` to write an API_KEY into .env, or set AUTH_MODE (see docs/auth.md).',
     );
     this.name = 'MissingApiKeyError';
   }
@@ -108,7 +112,7 @@ function resolvePort(requested: number | undefined, env: NodeJS.ProcessEnv): num
 }
 
 /**
- * Whether the key is shorter than one `setApiKey` makes. Short keys are allowed, because a
+ * Whether the key is shorter than one `set-api-key` makes. Short keys are allowed, because a
  * hand-edited `.env` is the user's to write and a floor is a policy choice, but a short key on
  * a service bound to every interface is worth a warning. Only the comparison is made here: the
  * key and its length are never returned or logged.
@@ -180,8 +184,8 @@ export async function startService(opts: StartOptions = {}): Promise<ServiceHand
       if (apiKey !== undefined && isShorterThanGenerated(apiKey)) {
         log.warn(
           { step: 'checkKey' },
-          'API_KEY is shorter than the keys `bun run setApiKey` makes, and the service listens on every ' +
-            'network interface; run `bun run setApiKey --burn-after-reading` to replace it with a strong one.',
+          'API_KEY is shorter than the keys `bun run set-api-key` makes, and the service listens on every ' +
+            'network interface; run `bun run set-api-key --burn-after-reading` to replace it with a strong one.',
         );
       }
       app.use('/auth', authRouter(db, auth));

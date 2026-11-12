@@ -9,7 +9,7 @@ import { scoped } from '../../logging.ts';
  * page covers, `offset` rows in and at most `limit` long.
  */
 export interface CompanyListQuery {
-  /** The ticker prefix or name part to match, or `undefined` to match every company. */
+  /** The ticker prefix, name part or CIK to match, or `undefined` to match every company. */
   readonly q: string | undefined
   /** Keep only the companies in or out of the summary, or `undefined` to keep both. */
   readonly selected: boolean | undefined

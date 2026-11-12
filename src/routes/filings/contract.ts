@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { Company } from '../../entities/company.ts';
-import { Filing, FilingLinks, TrackedForm } from '../../entities/filing.ts';
+import { Filing, FilingLinks, FormBucket } from '../../entities/filing.ts';
 import { pageOf, PaginationQuery, Ticker } from '../common.ts';
 
 /** The domain every line of `filing_list` and `filing_summary` carries, bound by both transport files. */
@@ -15,14 +15,14 @@ export type FilingSort = z.infer<typeof FilingSort>;
 
 /**
  * The input of `filing_list`, `GET /companies/:ticker/filings`: the paging fields, the ticker
- * from the path, upper cased, `form` to keep only the filings of one base form, amendments
- * included, and `sort`, newest first by default. Strict, so a stray field is refused.
+ * from the path, upper cased, `form` to keep only the filings of one bucket, a named base form
+ * with its amendments or `other` for every other form, and `sort`, newest first by default. Strict, so a stray field is refused.
  */
 export const FilingListInput = PaginationQuery.extend({
   /** The ticker from the path, upper cased. */
   ticker: Ticker,
-  /** The base form to keep, amendments included; every tracked form when absent. */
-  form: TrackedForm.optional(),
+  /** The bucket to keep: a named base form, amendments included, or `other`; every form when absent. */
+  form: FormBucket.optional(),
   /** The order of the filings, newest first by default. */
   sort: FilingSort.default('-filingDate'),
 });
@@ -43,20 +43,27 @@ export type FilingListOutput = z.infer<typeof FilingListOutput>;
 
 /**
  * The input of `filing_summary`, `GET /filings/summary`: the paging fields, and `form` to narrow
- * the summary to one base form. Strict, so a stray field is refused.
+ * the summary to one bucket, a named base form or `other`. Strict, so a stray field is refused.
  */
 export const SummaryInput = PaginationQuery.extend({
-  /** The base form to narrow the counts to; every tracked form when absent. */
-  form: TrackedForm.optional(),
+  /** The bucket to narrow the counts to; every form when absent. */
+  form: FormBucket.optional(),
 });
+
+/** A count of filings in one bucket. */
+const BucketCount = z.number();
+
+/** The filing date of a bucket's newest filing, `YYYY-MM-DD`, or `null` when there is none. */
+const BucketDate = z.string().nullable();
 
 /** The parsed input of `filing_summary`, as {@link SummaryInput} reads it. */
 export type SummaryInput = z.infer<typeof SummaryInput>;
 
 /**
- * One company of the summary: its name, ticker and CIK, its count of filings per tracked form
- * and in total, the filing date and links of its latest 10-K, or `null` when it filed none in
- * the last year, and when its filings were last synced.
+ * One company of the summary: its name, ticker and CIK, its count of filings per bucket and in
+ * total, the filing date of its newest filing per bucket, the filing date and links
+ * of its latest 10-K, or `null` when it filed none in the last year, and when its filings were
+ * last synced.
  */
 export const CompanySummary = z.strictObject({
   /** The company's SEC Central Index Key. */
@@ -65,16 +72,41 @@ export const CompanySummary = z.strictObject({
   ticker: z.string(),
   /** The company's name as SEC lists it. */
   name: z.string(),
-  /** The company's filings in the last year, per tracked form, amendments included, and in total. */
+  /** The company's filings in the last year, per bucket, amendments included, and in total. */
   counts: z.strictObject({
-    /** The count of 10-K filings. */
-    '10-K': z.number(),
-    /** The count of 10-Q filings. */
-    '10-Q': z.number(),
-    /** The count of 8-K filings. */
-    '8-K': z.number(),
-    /** The count across every tracked form. */
-    total: z.number(),
+    /** The count of 10-K filings, the annual report. */
+    '10-K': BucketCount,
+    /** The count of 10-Q filings, the quarterly report. */
+    '10-Q': BucketCount,
+    /** The count of 8-K filings, the current report. */
+    '8-K': BucketCount,
+    /** The count of 6-K filings, a foreign issuer's current report. */
+    '6-K': BucketCount,
+    /** The count of Form 4 filings, an insider's trade. */
+    '4': BucketCount,
+    /** The count of Form 144 filings, a notice of a planned sale of restricted stock. */
+    '144': BucketCount,
+    /** The count of every other form, such as SCHEDULE 13G or 424B2. */
+    other: BucketCount,
+    /** The count across every bucket. */
+    total: BucketCount,
+  }),
+  /** The filing date of the newest filing per bucket, amendments included, or `null` for a bucket it filed none of. */
+  lastFiled: z.strictObject({
+    /** The newest 10-K's filing date. */
+    '10-K': BucketDate,
+    /** The newest 10-Q's filing date. */
+    '10-Q': BucketDate,
+    /** The newest 8-K's filing date. */
+    '8-K': BucketDate,
+    /** The newest 6-K's filing date. */
+    '6-K': BucketDate,
+    /** The newest Form 4's filing date. */
+    '4': BucketDate,
+    /** The newest Form 144's filing date. */
+    '144': BucketDate,
+    /** The newest filing date of any other form. */
+    other: BucketDate,
   }),
   /** The latest 10-K's filing date and links, or `null` when the company filed none in the last year. */
   latest10K: z.strictObject({

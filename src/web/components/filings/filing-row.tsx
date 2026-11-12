@@ -4,11 +4,22 @@ import { Badge, Button, Content, Entity } from '@open-tomato/components';
 
 import { DOCUMENT_LINK_LABEL, IX_VIEWER_LABEL } from './logic.ts';
 
+/** The props of {@link SecLink}. */
+export interface SecLinkProps {
+  /** The sec.gov address. */
+  readonly href: string
+  /** The link's text. */
+  readonly children: string
+}
+
 /**
  * A sec.gov link opening in a new tab with no `window.opener` handed to it, drawn as the
  * library's small `ghost` `Button` over the anchor.
+ *
+ * @param props - The address and the text, as {@link SecLinkProps} lists them.
+ * @returns The link.
  */
-function SecLink({ href, children }: { readonly href: string, readonly children: string }) {
+export function SecLink({ href, children }: SecLinkProps) {
   return (
     <Button asChild variant="ghost" size="sm">
       <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>

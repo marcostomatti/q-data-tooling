@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 
 import { readFileSync } from 'node:fs';
 
-import { ConfirmPopover, Content } from '@open-tomato/components';
+import { Button, ConfirmPopover, Content, FormField, SectionCard, TextInput } from '@open-tomato/components';
 import { describe, expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 
@@ -12,6 +12,7 @@ import { pageFor, PAGES, Shell } from '../../src/web/app.tsx';
 import { LoginPage, LoginView } from '../../src/web/pages/login.tsx';
 import { SUMMARY_PATH, SUMMARY_TITLE } from '../../src/web/pages/summary/logic.ts';
 import {
+  FreshToken,
   MintForm,
   REVOKE_CONFIRM_LABEL,
   REVOKE_LABEL,
@@ -76,6 +77,18 @@ describe('Shell', () => {
     expect(html).toMatch(/<button[^>]*>Sign out<\/button>/);
     expect(html).toContain('<p>page body</p>');
   });
+
+  test('puts the theme switch in the topbar, offering the other theme', () => {
+    const light = renderShell('/tokens');
+    const dark = renderToStaticMarkup(
+      <Shell current={pageFor('/tokens')} onSignOut={noop} onNavigate={noop} theme="dark">
+        <p>page body</p>
+      </Shell>,
+    );
+
+    expect(light).toMatch(/<header[^>]*>.*aria-label="Switch to dark theme".*<\/header>/);
+    expect(dark).toMatch(/<header[^>]*>.*aria-label="Switch to light theme".*<\/header>/);
+  });
 });
 
 /** The class list of the first element the pattern's group captures, split into names. */
@@ -102,8 +115,8 @@ describe('Shell layout', () => {
     }
   });
 
-  test('pushes the sign-out action to the far end of the topbar, after the title that takes the free space', () => {
-    expect(renderShell('/tokens')).toMatch(/<h1[^>]*>Tokens<\/h1><button[^>]*>Sign out<\/button>/);
+  test('pushes the theme switch and then sign-out to the far end of the topbar, after the title that takes the free space', () => {
+    expect(renderShell('/tokens')).toMatch(/<h1[^>]*>Tokens<\/h1>.*aria-label="Switch to dark theme".*<button[^>]*>Sign out<\/button><\/header>/);
   });
 });
 
@@ -223,11 +236,25 @@ describe('TokensView', () => {
     expect(named).toMatch(/<button[^>]*>Create token<\/button>/);
   });
 
-  test('the mint form stacks the field over its button row, as the library\'s FormKit story does', () => {
-    const form = MintForm({ tokens: [], name: 'ci runner' }) as ReactElement<{ children: ReactElement<{ direction?: string }> }>;
-    const column = form.props.children;
-    expect(column.type).toBe(Content);
-    expect(column.props.direction).toBe('col');
+  test('the mint form puts the create button on the right of the name input, inside the field', () => {
+    type Node = ReactElement<{ children: Node | Node[], direction?: string }>;
+    const form = MintForm({ tokens: [], name: 'ci runner' }) as Node;
+    const field = form.props.children as Node;
+    const row = field.props.children as Node;
+    const [input, button] = row.props.children as Node[];
+
+    expect(field.type).toBe(FormField);
+    expect(row.type).toBe(Content);
+    expect(row.props.direction).toBe('row');
+    expect(input?.type).toBe(TextInput);
+    expect(button?.type).toBe(Button);
+  });
+
+  test('the just-minted token sits in a SectionCard, not a success banner', () => {
+    const card = FreshToken({ token: WHOLE_TOKEN });
+
+    expect(card.type).toBe(SectionCard);
+    expect(renderToStaticMarkup(<TokensView tokens={LISTED} fresh={WHOLE_TOKEN} />)).not.toContain('bg-success-wash');
   });
 
   test('a revoked token carries the revoked badge and no Revoke button', () => {
@@ -341,9 +368,9 @@ describe('TokensView', () => {
 });
 
 describe('the page table', () => {
-  test('lands on the summary, then holds companies, then tokens', () => {
+  test('lands on the summary, then holds filings, companies, then tokens', () => {
     expect(APP.landing).toEqual({ path: SUMMARY_PATH, label: SUMMARY_TITLE });
-    expect(PAGES.map((page) => page.path)).toEqual([SUMMARY_PATH, '/companies', '/tokens']);
+    expect(PAGES.map((page) => page.path)).toEqual([SUMMARY_PATH, '/filings', '/companies', '/tokens']);
     expect(PAGES[0]?.label).toBe(APP.landing.label);
   });
 
@@ -359,27 +386,27 @@ describe('the page table', () => {
 });
 
 describe('the pages together', () => {
-  test('/ and an unknown path land on the summary, and PAGES holds only /summary, /companies and /tokens', () => {
+  test('/ and an unknown path land on the summary, and PAGES holds only /summary, /filings, /companies and /tokens', () => {
     expect(pageFor('/').path).toBe(SUMMARY_PATH);
     expect(pageFor('/nowhere').path).toBe(SUMMARY_PATH);
-    expect(PAGES).toHaveLength(3);
+    expect(PAGES).toHaveLength(4);
   });
 
   test.each(PAGES.map((page) => page.path))('the nav holds one entry per PAGES entry around the page at %s', (path) => {
     const html = renderToStaticMarkup(
       <Shell current={pageFor(path)} onSignOut={noop} onNavigate={noop}>
-        {pageFor(path).render()}
+        {pageFor(path).render(path)}
       </Shell>,
     );
     const entries = navEntries(html);
 
     expect(entries.map((entry) => entry.label)).toEqual(PAGES.map((page) => page.label));
     expect(entries.filter((entry) => entry.current).map((entry) => entry.label)).toEqual([pageFor(path).label]);
-    expect(html).toContain(renderToStaticMarkup(pageFor(path).render()));
+    expect(html).toContain(renderToStaticMarkup(pageFor(path).render(path)));
   });
 
   test.each(PAGES.map((page) => page.path))('the page at %s leaves its title to the topbar and draws no h1 of its own', (path) => {
-    expect(renderToStaticMarkup(pageFor(path).render())).not.toContain('<h1');
+    expect(renderToStaticMarkup(pageFor(path).render(path))).not.toContain('<h1');
   });
 });
 

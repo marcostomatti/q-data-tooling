@@ -19,8 +19,9 @@ import { companies, companyTickers } from '../active.ts';
 /** The filters and the window of a company list. */
 export interface CompanyListFilter {
   /**
-   * A ticker prefix or a part of the name, matched in any case, or `undefined` to match every
-   * company. A company matches when any of its tickers starts with it or its name contains it.
+   * A ticker prefix, a part of the name or a CIK, matched in any case, or `undefined` to match
+   * every company. A company matches when any of its tickers starts with it, its name contains
+   * it, or it is digits only and equals the company's CIK, leading zeros or not.
    */
   readonly q: string | undefined
   /** Keep only the companies in the summary (`true`) or out of it (`false`), or both (`undefined`). */
@@ -78,16 +79,27 @@ function likeAnyCase(column: AnyColumn, pattern: string): SQL {
   return sql`lower(${column}) like lower(${pattern}) escape ${LIKE_ESCAPE}`;
 }
 
+/** A `q` of digits only, which may also be a CIK, with or without the SEC's leading zeros. */
+const DIGITS = /^\d+$/;
+
 /**
- * The condition `q` sets: a ticker of the company starts with it, or its name contains it. The
- * tickers are matched in a subquery that does not refer to the company row, so the database runs
- * it once; a per-company `exists` would scan `company_tickers` once for each of the companies.
+ * The condition `q` sets: a ticker of the company starts with it, its name contains it, or, when
+ * `q` is digits only, it is the company's whole CIK, so `320193` and `0000320193` both find Apple
+ * and `3201` finds no CIK. The tickers are matched in a subquery that does not refer to the
+ * company row, so the database runs it once; a per-company `exists` would scan `company_tickers`
+ * once for each of the companies.
  */
 function matchesQuery(db: Db, q: string): SQL | undefined {
   const escaped = escapeLike(q);
   const tickerPrefix = db.select({ cik: companyTickers.cik }).from(companyTickers)
     .where(likeAnyCase(companyTickers.ticker, `${escaped}%`));
-  return or(inArray(companies.cik, tickerPrefix), likeAnyCase(companies.name, `%${escaped}%`));
+  return or(
+    inArray(companies.cik, tickerPrefix),
+    likeAnyCase(companies.name, `%${escaped}%`),
+    DIGITS.test(q)
+      ? eq(companies.cik, Number(q))
+      : undefined,
+  );
 }
 
 /** The `where` of a list: every filter the caller set, joined with `and`. */

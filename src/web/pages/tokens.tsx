@@ -10,6 +10,9 @@ import {
   EmptyState,
   FormattedDate,
   FormField,
+  Icon,
+  IconButton,
+  SectionCard,
   Table,
   TextInput,
 } from '@open-tomato/components';
@@ -60,36 +63,53 @@ function When({ iso }: { readonly iso: string | null }) {
 }
 
 /** The token just minted, with a copy button and a dismiss; it is not shown again after. */
-function FreshToken({ token, copied = false, onCopy, onDismiss }: {
+/** The props of {@link FreshToken}: the token just minted and the card's handlers. */
+export interface FreshTokenProps {
+  /** The whole token, shown this once. */
   readonly token: string
+  /** Set once the token went to the clipboard. */
   readonly copied?: boolean
   readonly onCopy?: () => void
   readonly onDismiss?: () => void
-}) {
+}
+
+/**
+ * The token just minted, shown once in the library's `SectionCard`: a title and a subtitle saying
+ * it is not stored, a dismiss button in the header, the token with a copy button, and a footer
+ * line on how to send it.
+ *
+ * @param props - The token and the handlers, as {@link FreshTokenProps} lists them.
+ * @returns The card.
+ */
+export function FreshToken({ token, copied = false, onCopy, onDismiss }: FreshTokenProps) {
   return (
-    <Banner tone="success" role="status" title="Copy this token now" onClose={onDismiss}>
-      <Content direction="col" gap="sm">
-        <span>It is shown once and is not stored; only its hash is.</span>
-        <Content direction="row" align="center" gap="sm">
-          <code>{token}</code>
-          <Button variant="secondary" size="sm" onClick={() => onCopy?.()}>
-            {copied
-              ? 'Copied'
-              : 'Copy'}
-          </Button>
-        </Content>
+    <SectionCard
+      role="status"
+      title="Copy this token now"
+      subtitle="It is shown once and is not stored; only its hash is."
+      action={<IconButton icon={<Icon name="x" size={16} />} label="Dismiss" onClick={() => onDismiss?.()} />}
+      footer={(
         <span>
           Send it as <code>Authorization: Bearer &lt;token&gt;</code> to <code>/api</code>.
         </span>
+      )}
+    >
+      <Content direction="row" align="center" gap="sm">
+        <code>{token}</code>
+        <Button variant="secondary" size="sm" onClick={() => onCopy?.()}>
+          {copied
+            ? 'Copied'
+            : 'Copy'}
+        </Button>
       </Content>
-    </Banner>
+    </SectionCard>
   );
 }
 
 /**
- * The form that mints a token: the name field with its hint, and under it the create button on
- * a row of its own, as the library's FormKit story lays a form out. The button is disabled
- * while the name is blank or a mint is in flight.
+ * The form that mints a token: the name field, whose control is a row of the name input and the
+ * create button on its right, so the button lines up with the input and the hint sits under
+ * both. The button is disabled while the name is blank or a mint is in flight.
  *
  * @param props - The typed name, the busy flag and the handlers, from {@link TokensViewProps}.
  * @returns The form.
@@ -104,8 +124,8 @@ export function MintForm({ name = '', busy = false, onNameChange, onMint }: Toke
 
   return (
     <form onSubmit={submit}>
-      <Content direction="col" gap="sm">
-        <FormField label="Name" htmlFor={NAME_INPUT_ID} hint="One per agent or HTTP client, so each can be revoked on its own.">
+      <FormField label="Name" htmlFor={NAME_INPUT_ID} hint="One per agent or HTTP client, so each can be revoked on its own.">
+        <Content direction="row" align="center" gap="sm">
           <TextInput
             id={NAME_INPUT_ID}
             placeholder="e.g. research agent"
@@ -113,15 +133,13 @@ export function MintForm({ name = '', busy = false, onNameChange, onMint }: Toke
             value={name}
             onChange={(next: string) => onNameChange?.(next)}
           />
-        </FormField>
-        <Content direction="row" gap="sm">
           <Button variant="primary" disabled={blank || busy} onClick={() => onMint?.()}>
             {busy
               ? 'Creating…'
               : 'Create token'}
           </Button>
         </Content>
-      </Content>
+      </FormField>
     </form>
   );
 }

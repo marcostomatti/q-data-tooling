@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { Filing, FilingLinks, TrackedForm } from '../../src/entities/filing.ts';
+import { bucketOf, Filing, FilingLinks, FORM_BUCKETS, FormBucket, NAMED_FORMS, NamedForm, OTHER_FORMS } from '../../src/entities/filing.ts';
 
 /** The folder of the example filing in "Data normalization". */
 const folder = 'https://www.sec.gov/Archives/edgar/data/320193/000032019326000026';
@@ -35,18 +35,46 @@ const filing = {
   links,
 };
 
-describe('TrackedForm', () => {
-  test('accepts the three base forms', () => {
-    expect(TrackedForm.options).toEqual(['10-K', '10-Q', '8-K']);
-    for (const form of TrackedForm.options) {
-      expect(TrackedForm.parse(form)).toBe(form);
+describe('NamedForm', () => {
+  test('names the three core forms, then the three filed most often after them', () => {
+    expect(NAMED_FORMS).toEqual(['10-K', '10-Q', '8-K', '6-K', '4', '144']);
+    // zod 4 lists integer-like keys first, so only the set of options matches the list.
+    expect([...NamedForm.options].sort()).toEqual([...NAMED_FORMS].sort());
+    for (const form of NAMED_FORMS) {
+      expect(NamedForm.parse(form)).toBe(form);
     }
   });
 
   test('refuses an amendment, another form and lower case', () => {
-    expect(TrackedForm.safeParse('10-K/A').success).toBe(false);
-    expect(TrackedForm.safeParse('S-1').success).toBe(false);
-    expect(TrackedForm.safeParse('10-k').success).toBe(false);
+    expect(NamedForm.safeParse('10-K/A').success).toBe(false);
+    expect(NamedForm.safeParse('S-1').success).toBe(false);
+    expect(NamedForm.safeParse('10-k').success).toBe(false);
+  });
+});
+
+describe('FormBucket', () => {
+  test('is every named form, then other', () => {
+    expect(FORM_BUCKETS).toEqual([...NAMED_FORMS, OTHER_FORMS]);
+    expect([...FormBucket.options].sort()).toEqual([...FORM_BUCKETS].sort());
+    expect(OTHER_FORMS).toBe('other');
+  });
+
+  test('refuses a form outside the buckets, such as S-1', () => {
+    expect(FormBucket.safeParse('S-1').success).toBe(false);
+  });
+});
+
+describe('bucketOf', () => {
+  test('a named base form is its own bucket', () => {
+    for (const form of NAMED_FORMS) {
+      expect(bucketOf(form)).toBe(form);
+    }
+  });
+
+  test('every other base form counts under other, SCHEDULE 13G and 424B2 among them', () => {
+    expect(bucketOf('SCHEDULE 13G')).toBe('other');
+    expect(bucketOf('424B2')).toBe('other');
+    expect(bucketOf('3')).toBe('other');
   });
 });
 

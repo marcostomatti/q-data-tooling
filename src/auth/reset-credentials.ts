@@ -72,7 +72,7 @@ export async function main(io: ResetIo): Promise<number> {
       removedHash
         ? 'Removed AUTH_PASSWORD_HASH from .env.'
         : 'No AUTH_PASSWORD_HASH was set in .env.',
-      'API_KEY is unchanged; to replace it, run `bun run setApiKey --burn-after-reading`.',
+      'API_KEY is unchanged; to replace it, run `bun run set-api-key --burn-after-reading`.',
       'Agents and clients that used a minted token need a new one from the Tokens page.',
       ...nextSteps(mode),
       '',

@@ -73,7 +73,8 @@ describe('filingStore(db).summary', () => {
       cik: APPLE_CIK,
       ticker: 'AAPL',
       name: 'Apple Inc.',
-      counts: { '10-K': 1, '10-Q': 0, '8-K': 0, total: 1 },
+      counts: { '10-K': 1, '10-Q': 0, '8-K': 0, '6-K': 0, '4': 0, '144': 0, other: 0, total: 1 },
+      lastFiled: { '10-K': '2026-11-03', '10-Q': null, '8-K': null, '6-K': null, '4': null, '144': null, other: null },
       latest10K: { filingDate: '2026-11-03', links: APPLE_10K.links },
       filingsSyncedAt: null,
     });
@@ -86,8 +87,8 @@ describe('filingStore(db).summary', () => {
     const second = await filingStore(db).summary({ form: undefined, offset: 1, limit: 1 });
 
     expect(narrowed.items.map((summary) => summary.counts)).toEqual([
-      { '10-K': 0, '10-Q': 0, '8-K': 0, total: 0 },
-      { '10-K': 0, '10-Q': 0, '8-K': 0, total: 0 },
+      { '10-K': 0, '10-Q': 0, '8-K': 0, '6-K': 0, '4': 0, '144': 0, other: 0, total: 0 },
+      { '10-K': 0, '10-Q': 0, '8-K': 0, '6-K': 0, '4': 0, '144': 0, other: 0, total: 0 },
     ]);
     expect(second).toMatchObject({ items: [{ ticker: 'WMT' }], total: 2 });
   });

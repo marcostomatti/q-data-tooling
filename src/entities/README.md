@@ -7,8 +7,8 @@ knows nothing of HTTP, MCP or the database.
 An entity may import only `zod` and other entities.
 
 The entities that ship are `company.ts` (`Company`, `CompanyTicker`, `toCik10`) and `filing.ts`
-(`Filing`, `FilingLinks`, `TrackedForm`). Each names its schema and its inferred type alike, so
-`Company` is both.
+(`Filing`, `FilingLinks`, `NamedForm`, `FormBucket`, `bucketOf`). Each names its schema and its
+inferred type alike, so `Company` is both.
 
 Sketch of a note entity, `src/entities/<name>.ts` with `note` as the name:
 

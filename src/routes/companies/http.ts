@@ -15,7 +15,7 @@ import { updateCompany } from './update.flow.ts';
  * domain on the request's log and hands it to the flow, and logs nothing itself.
  */
 export const companyListRoute = route('get', '/companies', 'company_list', CompanyListInput, {
-  summary: 'Lists one page of companies, matched by ticker prefix or name with q and filtered by selected.',
+  summary: 'Lists one page of companies, matched by ticker prefix, name or CIK with q and filtered by selected.',
   output: CompanyListOutput,
 }, async (input, { db, log }) => listCompanies(input, { store: companyStore(db), log: inDomain(log, DOMAIN) }));
 

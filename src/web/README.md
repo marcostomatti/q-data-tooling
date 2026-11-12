@@ -38,8 +38,33 @@ A piece that opens over a page rather than being one sits in
 pure `FilingsPanel` (`panel.tsx`) inside them and read which overlay the view
 returns by calling it.
 In the drawer the panel lists the filings in the library's `Accordion`, one
-group per tracked form. A closed group renders no children, so a test that reads
-a group's links opens it with `defaultOpen`.
+group per form bucket: the six named forms, then Other. A closed group renders
+no children, so a test that reads a group's links opens it with `defaultOpen`.
+`pager.tsx` is the one file that is not a folder: the Companies toolbar's pages,
+counted from 1, over the `Pagination` port.
+
+### Ports
+
+`src/web/components/ports/` holds local copies of library components with one
+fix each, until the library takes the fix and the copy is deleted. Each file
+names the library version it copies and the one change it makes.
+
+- `pagination.tsx`, over `page-slots.ts`: the library's `Pagination` with
+  windowing, the first and last pages, the current one with a sibling each
+  side, and an ellipsis for each hidden run. The library draws one button per
+  page, 321 of them for every company.
+- `topbar.tsx`: the library's `AppShellTopbar` with `relative z-50` on the band.
+  The band's `backdrop-filter` makes it a stacking context, so the company
+  search's list painted under positioned page content, such as the Companies
+  toolbar's `Segmented`.
+
+## A page with a path segment
+
+A page can draw the paths under its own: `pageFor` gives `/filings/320193` to the `/filings`
+page, and `render` receives the browser's path, so the Filings page reads the CIK from it with
+`cikFromPath`. Its server path needs the same pattern in `APP_PATHS`, here `/filings/:cik`, so a
+reload there is served the app. The page is keyed by the CIK, so a new company starts on every
+form.
 
 ## Adding a page to `PAGES`
 

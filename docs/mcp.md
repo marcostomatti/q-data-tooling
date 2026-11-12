@@ -31,10 +31,10 @@ Turn it on when an agent should call the service. Two transports carry it:
 | Tool | Title | What it returns |
 | --- | --- | --- |
 | `service_info` | Service info | The service id, name and version, the database dialect (`sqlite` or `pg`) and whether the notebook tools are on. It takes no arguments and only reads. |
-| `company_list` | List companies | One page of companies with the total across every page, matched by ticker prefix or name with `q` and filtered by `selected`. It only reads. |
+| `company_list` | List companies | One page of companies with the total across every page, matched by ticker prefix, name or CIK with `q` and filtered by `selected`. It only reads. |
 | `company_update` | Update a company | The company with `ticker`, after setting whether it is in the summary from the required `selected` flag. It fails when no company trades under the ticker. |
-| `filing_list` | List filings | The company with `ticker` and one page of its 10-K, 10-Q and 8-K filings with their SEC links, filtered by base form with `form` and sorted by filing date with `sort`. It fails when no company trades under the ticker, and only reads. |
-| `filing_summary` | Summarize filings | One page of the companies in the summary, each with its filing counts per form and in total and its latest 10-K, narrowed by base form with `form`. It only reads. |
+| `filing_list` | List filings | The company with `ticker` and one page of its filings of the last year, every form, with their SEC links, filtered with `form` by a named base form (`10-K`, `10-Q`, `8-K`, `6-K`, `4`, `144`) or `other` for every other form, and sorted by filing date with `sort`. It fails when no company trades under the ticker, and only reads. |
+| `filing_summary` | Summarize filings | One page of the companies in the summary, each with its filing counts per form, `other` included, and in total, its newest filing date per form and its latest 10-K, narrowed to one form or `other` with `form`. It only reads. |
 
 When `OPEN_NOTEBOOK_URL` is set and the notebook answers at startup, `src/mcp/server.ts` adds eight
 more after those. They are the [Open Notebook](open-notebook.md) tools:

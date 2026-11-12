@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react';
 
 import { companies, messageOf, type CompanyPage, type CompanyQuery } from '../../api.ts';
 import { FilingsDialog } from '../../components/filings/index.tsx';
+import { pageCountOf } from '../../components/pager.tsx';
 
 import {
   INITIAL_QUERY,
   SEARCH_DEBOUNCE_MS,
-  pageCountOf,
   withCompany,
   withSearch,
   withSelectedOnly,

@@ -46,6 +46,16 @@ an entry after the landing entry, which must stay first. The declaration as it s
 ```tsx
 export const PAGES: readonly AppPage[] = [
   { path: APP.landing.path, label: APP.landing.label, icon: 'chart-column-stacked', render: () => <SummaryPage /> },
+  {
+    path: FILINGS_PATH,
+    label: FILINGS_TITLE,
+    icon: 'file-text',
+    // One page per CIK, so a new company starts on its first page with no filter.
+    render: (path) => {
+      const cik = cikFromPath(path);
+      return <FilingsPage key={cik ?? 'none'} cik={cik} />;
+    },
+  },
   { path: '/companies', label: COMPANIES_TITLE, icon: 'building-2', render: () => <CompaniesPage /> },
   { path: '/tokens', label: 'Tokens', icon: 'key-round', render: () => <TokensPage /> },
 ];
@@ -55,17 +65,17 @@ The new entry is one line like the `/companies` one, with its own path, label, i
 `<Name>Page`, and it goes after the landing line and before the closing `];`.
 
 **Server path:** `APP_PATHS` in `src/http/server.ts`, which today is `['/', '/login',
-APP.landing.path, '/companies', '/tokens']`. Add `'/<name>'`, so a reload on the new page is
-served the app and not a 404.
+APP.landing.path, '/filings', '/filings/:cik', '/companies', '/tokens']`. Add `'/<name>'`, so a
+reload on the new page is served the app and not a 404.
 
 **Pinned lists:** three tests pin these lists exactly, and each fails until you update it in the
 same change. Where a test's title names the old list, retitle it to match.
 
 - `APP_PATHS` in `tests/http/server.test.ts`: add the same `'/<name>'` to its `toEqual`.
 - `PAGES` in `tests/web/pages.test.tsx`, in two tests. The first test of the `the page table` block
-  holds `toEqual([SUMMARY_PATH, '/companies', '/tokens'])`, and the first of `the pages together`
-  holds `toHaveLength(3)`. Add `'/<name>'` where it sits in `PAGES`, so after the landing path,
-  and raise the length by one.
+  holds `toEqual([SUMMARY_PATH, '/filings', '/companies', '/tokens'])`, and the first of `the pages
+  together` holds `toHaveLength(4)`. Add `'/<name>'` where it sits in `PAGES`, so after the landing
+  path, and raise the length by one.
 
 **Test:** `tests/web/<name>.test.tsx`. Render `<Name>View` with `renderToStaticMarkup` from
 react-dom/server, assert its empty-state text and that it holds no `<h1`, and assert

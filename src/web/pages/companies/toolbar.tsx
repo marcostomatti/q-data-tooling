@@ -1,6 +1,4 @@
 import {
-  Button,
-  Content,
   SearchInput,
   Segmented,
   Toolbar,
@@ -8,6 +6,8 @@ import {
   ToolbarSep,
   ToolbarSummary,
 } from '@open-tomato/components';
+
+import { Pager } from '../../components/pager.tsx';
 
 import { COMPANY_FILTERS } from './logic.ts';
 
@@ -30,9 +30,10 @@ export interface CompaniesToolbarProps {
 
 /**
  * The control bar over the company list: the search, the All / Selected filter as the library's
- * `Segmented`, and Previous and Next buttons around `Page n of N`. The library's `Pagination`
- * draws one button per page, which the full ticker list would turn into hundreds, so the bar
- * steps a page at a time instead.
+ * `Segmented`, then the {@link Pager} at the start of the summary row and the count at its end.
+ * The pager comes first so it keeps its place whatever the count's width, which changes with
+ * the filter. The pager is the local `Pagination` port, which windows the full list's hundreds
+ * of pages around the current one.
  *
  * @param props - The bar's values and handlers, as {@link CompaniesToolbarProps} lists them.
  * @returns The toolbar.
@@ -60,19 +61,11 @@ export function CompaniesToolbar(props: CompaniesToolbarProps) {
         />
       </ToolbarControls>
       <ToolbarSummary>
-        <span>{total === 1
+        <Pager page={page} pageCount={pageCount} onPageChange={onPageChange} />
+        <span className="ml-auto">{total === 1
           ? '1 company'
           : `${total} companies`}
         </span>
-        <Content direction="row" align="center" gap="sm">
-          <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => onPageChange?.(page - 1)}>
-            Previous
-          </Button>
-          <span>{`Page ${page} of ${pageCount}`}</span>
-          <Button variant="secondary" size="sm" disabled={page >= pageCount} onClick={() => onPageChange?.(page + 1)}>
-            Next
-          </Button>
-        </Content>
       </ToolbarSummary>
     </Toolbar>
   );

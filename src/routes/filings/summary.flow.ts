@@ -1,5 +1,5 @@
 import type { CompanySummary, SummaryInput, SummaryOutput } from './contract.ts';
-import type { TrackedForm } from '../../entities/filing.ts';
+import type { FormBucket } from '../../entities/filing.ts';
 import type { Log } from '../../logging.ts';
 
 import { scoped } from '../../logging.ts';
@@ -10,8 +10,8 @@ import { scoped } from '../../logging.ts';
  * at most `limit` long.
  */
 export interface SummaryQuery {
-  /** The base form to narrow the counts to, or `undefined` for every tracked form. */
-  readonly form: TrackedForm | undefined
+  /** The bucket to narrow the counts to, or `undefined` for every form. */
+  readonly form: FormBucket | undefined
   /** The count of selected companies to skip. */
   readonly offset: number
   /** The most summaries to return. */
@@ -43,7 +43,8 @@ export interface SummarizeFilingsDeps {
 
 /**
  * Summarizes the filings of the companies in the summary, one page of them: each company's
- * counts per tracked form and its latest 10-K. It reads stored rows only and never calls SEC.
+ * counts and newest filing date per bucket and its latest 10-K. It reads stored rows only
+ * and never calls SEC.
  *
  * Its scope is `summary`, and its one crumb is a `debug` line with step `read`: a read is routine.
  *

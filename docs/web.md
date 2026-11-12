@@ -26,11 +26,14 @@ The signed-in app has these pages, in nav order:
 | Path | Nav label | Icon | Page |
 | --- | --- | --- | --- |
 | `/summary` | Summary | `chart-column-stacked` | `SummaryPage` in `src/web/pages/summary/`, the landing page |
+| `/filings`, `/filings/<cik>` | Filings | `file-text` | `FilingsPage` in `src/web/pages/filings/`: one company's filings by its CIK, or an empty state with none |
 | `/companies` | Companies | `building-2` | `CompaniesPage` in `src/web/pages/companies/` |
 | `/tokens` | Tokens | `key-round` | `TokensPage` in `src/web/pages/tokens.tsx`, for API tokens |
 
 `/summary` is the landing path in `APP.landing`. `/` lands there. A path the app does not list
-also shows the landing page, and the address bar is moved to it. The sign-in page is not in the
+also shows the landing page, and the address bar is moved to it. A path under a page's own path
+is that page's: `/filings/320193` is the Filings page on Apple's filings, and the page reads the
+CIK from the path, so the link can be shared or reloaded. The sign-in page is not in the
 nav: it is what the app shows when nobody is signed in. A page draws no heading of its own: the
 topbar's `AppShellTitle` shows its nav label as the screen's one `h1`.
 
@@ -46,7 +49,10 @@ bun run build:web
 ```
 
 The build writes `index.html` and two chunks, one `.js` and one `.css`, into `src/web/dist/`.
-Git ignores that folder. The build prints the path of each file it wrote.
+Git ignores that folder. The build prints the path of each file it wrote. `index.html` loads the
+chunks from the root, as `/chunk-….js`, so a page under a path segment, such as
+`/filings/320193`, loads them too. A chunk named relative to the page would be asked for as
+`/filings/chunk-….js` there, which the server answers with `index.html`.
 
 The default folder is emptied before every build, so a rebuild leaves no old chunks beside the
 new ones. A folder named with `--outdir` is not emptied, since it belongs to the caller:
@@ -61,9 +67,10 @@ A build that fails prints each of its messages to stderr, then `build:web failed
 
 `bun run serve` runs the build, then starts the service. The service looks for `src/web/dist/`
 once, when it starts. When the folder is there, the service serves its files and answers each
-path in `APP_PATHS` with `index.html`. Those paths are `/`, `/login`, the landing path and each
-other page's path. To see a change to the app, restart `bun run serve`, as
-[the web build](setup.md#the-web-build) says.
+path in `APP_PATHS` with `index.html`. Those paths are `/`, `/login`, the landing path, each
+other page's path, and `/filings/:cik`. To see a change to the app, restart `bun run serve`, as
+[the web build](setup.md#the-web-build) says, or run `bun run dev` instead: it rebuilds the app
+on every change under `src/`, and a page reload shows it.
 
 The app and the API share one origin, so the browser needs no CORS setup. A write from the app
 sends the `x-app-csrf: 1` header, which [auth](auth.md#the-csrf-header) explains.

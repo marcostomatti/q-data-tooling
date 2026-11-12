@@ -68,6 +68,12 @@ describe('bun scripts/build-web.ts --outdir', () => {
     expect(await readdir(outdir)).toContain('index.html');
     expect(await filesIn(outdir, '.css')).toMatch(BUTTON_UTILITY);
     expect(reactCopies(await filesIn(outdir, '.js'))).toBe(1);
+    // A page under a path segment, such as /filings/320193, resolves a relative
+    // `./chunk.css` to /filings/chunk.css, which the server answers with
+    // index.html; a chunk named from the root loads on every page.
+    const html = await Bun.file(join(outdir, 'index.html')).text();
+    expect(html).toMatch(/href="\/chunk-[a-z0-9]+\.css"/);
+    expect(html).toMatch(/src="\/chunk-[a-z0-9]+\.js"/);
   }, BUILD_TIMEOUT_MS);
 });
 

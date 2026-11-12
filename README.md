@@ -33,7 +33,7 @@ Then open the address `serve` prints and sign in at `/login` with that password.
   `bun run set-password` again and restart `serve`. A lost password is recovered with
   `bun run reset-credentials`, which removes the hash and signs out every session and API token;
   then run `set-password` again.
-- **An API key** is optional, for curl and MCP clients: `bun run setApiKey --burn-after-reading`
+- **An API key** is optional, for curl and MCP clients: `bun run set-api-key --burn-after-reading`
   writes one into `.env` and shows it once.
 - **SEC requests** need a declared User-Agent. Add `SEC_USER_AGENT="<app name> <contact email>"`
   to `.env`; SEC refuses requests without one, and allows at most 10 per second.

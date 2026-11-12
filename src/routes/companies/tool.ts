@@ -17,8 +17,8 @@ export const companyListTool: ToolDefinition = defineTool({
   title: 'List companies',
   description:
     'Returns one page of the companies the service tracks, with the total across every page. ' +
-    '`q` matches a ticker prefix or a name it contains, `selected` keeps only the companies in ' +
-    'or out of the summary, and `page` and `pageSize` choose the page.',
+    '`q` matches a ticker prefix, a name it contains or a whole CIK, `selected` keeps only the ' +
+    'companies in or out of the summary, and `page` and `pageSize` choose the page.',
   input: CompanyListInput,
   annotations: { readOnlyHint: true, openWorldHint: false },
   run: async (input, { db, log }) => listCompanies(input, { store: companyStore(db), log: inDomain(log, DOMAIN) }),

@@ -66,8 +66,13 @@ adds.
 - Companies are stored by CIK, with a `company_tickers` table mapping each ticker to its CIK,
   because the ticker file has 10,414 tickers for 8,009 CIKs (`AEM` and `AEMRF` are one company).
 - Only the last year of filings is stored; overflow files are never fetched.
-- The filter is three forms (`10-K`, `10-Q`, `8-K`), matched on the base form, so amendments
-  (`10-K/A`) count under their form with `isAmendment: true`. There is no category map.
+- Every form of the last year is stored. The filter and the summary name six base forms, the
+  three core forms (`10-K`, `10-Q`, `8-K`) and the three filed most often after them across
+  eleven synced companies' last year, read from SEC on 2026-11-12: Form `4` (558 filings),
+  `6-K` (154) and Form `144` (127). Every other base form counts and filters as `other`. Forms
+  are matched on the base form, so amendments (`10-K/A`) count under their form with
+  `isAmendment: true`. The first draft of this spec kept only the three core forms, because the
+  assessment's example named them; the example was not meant as the whole list.
 - `PATCH /companies/:ticker` takes a required `selected` boolean, not a toggle, so a retried
   request does not undo itself.
 - `GET /companies` takes `q`, because 8,009 companies are paged on the server and the search
@@ -152,7 +157,7 @@ it.
    run (`bun install`, `cp .env.example .env`, `bun run set-password`, `SEC_USER_AGENT`,
    `bun run db:migrate`, `bun run db:seed`, `bun run serve`, sign in at `/login`); how the
    password is stored (hash only) and recovered (`bun run reset-credentials`, then
-   `set-password`); the optional API key (`bun run setApiKey --burn-after-reading`); that the DB
+   `set-password`); the optional API key (`bun run set-api-key --burn-after-reading`); that the DB
    file is created by `db:migrate`, not by `serve`; the API docs at `/api/docs` and
    `/api/openapi.json`; the gates; links to this spec and every `docs/*.md` page (the indexes
    test requires them).
@@ -165,9 +170,9 @@ it.
 1. Add `PaginationQuery`, `pageOf`, `Ticker`, `PAGE_SIZE_DEFAULT`, `PAGE_SIZE_MAX` to
    `src/routes/common.ts` ("Shared route schemas"). `Ticker` accepts lower case and returns
    upper case.
-2. Add the entities `Company`, `CompanyTicker`, `Filing`, `FilingLinks`, `TrackedForm` and
-   `toCik10` under `src/entities/` ("Data normalization"). Entities import only zod and other
-   entities (`template/layer-imports`).
+2. Add the entities `Company`, `CompanyTicker`, `Filing`, `FilingLinks`, `NamedForm`,
+   `FormBucket` and `toCik10` under `src/entities/` ("Data normalization"). Entities import only
+   zod and other entities (`template/layer-imports`).
 3. `/be create-route companies` with `list` (`GET /companies`) and `update`
    (`PATCH /companies/:ticker`), and `/be create-route filings` with `list`
    (`GET /companies/:ticker/filings`) and `summary` (`GET /filings/summary`). Contracts from
@@ -228,7 +233,7 @@ it.
    5-row fixture from it (10-K, 8-K, Form 4, 424B2, UPLOAD).
 2. Contract test ("DoD verification"): the 1001 rows parse with 0 failures; with
    `now = 2026-11-11`, the last-year cut keeps 94 rows of every form, and 13 of them are the
-   three tracked forms: 1 × 10-K, 3 × 10-Q, 9 × 8-K.
+   three core forms: 1 × 10-K, 3 × 10-Q, 9 × 8-K.
 3. Unit tests for every case in "Edge cases for test suite".
 4. Live probe, off unless `SEC_LIVE=1`: `HEAD` the document, index and ix viewer links built for
    Apple's 10-K `0000320193-26-000026`, and expect 200 for each. A skipped probe reports as
@@ -275,7 +280,7 @@ it.
 - On a fresh `bun run db:migrate`, `bun run db:seed` run twice leaves 8,009 companies and 10,414
   tickers.
 - `bun test` runs the phase 4 contract test green: 1001 rows parse with 0 failures, and the
-  last-year cut keeps 94 rows, 13 of them in the three tracked forms.
+  last-year cut keeps 94 rows, 13 of them in the three core forms.
 - `SEC_LIVE=1 bun test` runs the phase 4 live probe, and the document, index and ix viewer links
   of Apple's 10-K `0000320193-26-000026` answer 200.
 - After the README's setup steps on a fresh clone, `PATCH /companies/AAPL` with

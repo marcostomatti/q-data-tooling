@@ -2,7 +2,7 @@
  * The sync of one company's filings from SEC, per "Ingest flow (one company)" in
  * `setup-prompt.md`. A company is stale when it was never synced or was last synced more than
  * `SYNC_TTL_HOURS` ago; a sync fetches its submissions document, keeps the filings of the last
- * `RETENTION_DAYS` in the three tracked base forms, stores the new ones, deletes the company's
+ * `RETENTION_DAYS`, every form, stores the new ones, deletes the company's
  * stored filings older than the cutoff, and writes the header fields with `filingsSyncedAt`.
  *
  * The filings list flow and the companies update flow call `syncIfStale`, never `syncFilings`
@@ -17,7 +17,6 @@ import type { Company } from '../../entities/company.ts';
 import type { Filing } from '../../entities/filing.ts';
 import type { Log } from '../../logging.ts';
 
-import { TrackedForm } from '../../entities/filing.ts';
 import { NotFoundError } from '../../errors.ts';
 import { scoped } from '../../logging.ts';
 import { SecRequestError, submissionsUrl } from '../../sec/client.ts';
@@ -112,9 +111,6 @@ const emptyToNull = (s: string): string | null => (s === ''
   ? null
   : s);
 
-/** Whether a filing is of one of the three tracked base forms, amendments included. */
-const isTracked = (filing: Filing): boolean => TrackedForm.safeParse(filing.baseForm).success;
-
 /**
  * Whether the company's stored filings are due for a sync: it was never synced, its
  * `filingsSyncedAt` is not a time, or that time is more than `SYNC_TTL_HOURS` before `now`.
@@ -131,13 +127,12 @@ export function isStale(company: Pick<Company, 'filingsSyncedAt'>, now: Date): b
   return now.getTime() - syncedAt > SYNC_TTL_HOURS * MS_PER_HOUR;
 }
 
-/** Parses the document and cuts its filings to the tracked forms of the last year, before anything is written. */
+/** Parses the document and cuts its filings to the last year, every form, before anything is written. */
 function readDocument(cik: number, document: unknown, now: Date, url: string): ReadDocument {
   try {
     const parsed = SubmissionsHeader.parse(document);
     const filings = withinRetention(columnsToRows(parsed.filings.recent), now)
-      .map((row) => toFiling(cik, row))
-      .filter(isTracked);
+      .map((row) => toFiling(cik, row));
     return {
       header: {
         exchanges: parsed.exchanges,
@@ -159,7 +154,8 @@ function readDocument(cik: number, document: unknown, now: Date, url: string): R
  * safe to retry: the new filings first (an insert keyed on the accession number skips the ones
  * stored before), then the delete of the company's filings older than the cutoff, and the
  * header with `filingsSyncedAt` last, so a company whose sync failed stays stale and the next
- * request syncs it again. Only filings of the three tracked base forms are stored.
+ * request syncs it again. Every form of the last year is stored; the summary and the filter
+ * count the ones `NamedForm` does not name under `other`.
  *
  * Its scope is `sync`, and its one crumb is an `info` line with step `write` once the header is
  * written: storing a company's filings is the use case's critical path.

@@ -167,7 +167,7 @@ describe('startService', () => {
     const failure = await startService().catch((error: unknown) => error);
 
     expect(failure).toBeInstanceOf(Error);
-    expect((failure as Error).message).toContain('setApiKey');
+    expect((failure as Error).message).toContain('set-api-key');
   });
 
   test.each([
@@ -478,8 +478,23 @@ describe('startService', () => {
 });
 
 describe('APP_PATHS', () => {
-  test('are the sign-in, the app\'s landing page (the summary), the companies page and the tokens page, beside the root', () => {
+  test('are the sign-in, the app\'s landing page (the summary), the filings page with and without a company, the companies page and the tokens page, beside the root', () => {
     expect(APP.landing.path).toBe('/summary');
-    expect(APP_PATHS).toEqual(['/', '/login', APP.landing.path, '/companies', '/tokens']);
+    expect(APP_PATHS).toEqual(['/', '/login', APP.landing.path, '/filings', '/filings/:cik', '/companies', '/tokens']);
+  });
+
+  test('a reload on the filings page, with or without a company, is answered with the app', async () => {
+    const webDist = await mkdtemp(join(tmpdir(), 'web-bundle-'));
+    try {
+      await writeFile(join(webDist, 'index.html'), '<!doctype html><title>app shell</title>');
+      const { handle } = await start({ webDist });
+      for (const path of ['/filings', '/filings/320193']) {
+        const response = await fetch(`${handle.url}${path}`);
+        expect(response.status).toBe(200);
+        expect(await response.text()).toContain('app shell');
+      }
+    } finally {
+      await rm(webDist, { recursive: true, force: true });
+    }
   });
 });

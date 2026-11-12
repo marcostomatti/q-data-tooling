@@ -12,7 +12,8 @@ const SUMMARY: CompanySummary = {
   cik: 320193,
   ticker: 'AAPL',
   name: 'Apple Inc.',
-  counts: { '10-K': 1, '10-Q': 0, '8-K': 0, total: 1 },
+  counts: { '10-K': 1, '10-Q': 0, '8-K': 0, '6-K': 0, '4': 0, '144': 0, other: 0, total: 1 },
+  lastFiled: { '10-K': '2026-11-03', '10-Q': null, '8-K': null, '6-K': null, '4': null, '144': null, other: null },
   latest10K: null,
   filingsSyncedAt: null,
 };

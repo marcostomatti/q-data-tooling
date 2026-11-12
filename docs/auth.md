@@ -102,7 +102,7 @@ match `OIDC_ISSUER` exactly, apart from a trailing slash, or sign-in is refused.
 ### The API key
 
 ```sh
-bun run setApiKey --burn-after-reading
+bun run set-api-key --burn-after-reading
 bun run serve
 ```
 
@@ -136,7 +136,7 @@ meaning.
 
 | Variable | Default | What it does | Read by |
 | --- | --- | --- | --- |
-| `API_KEY` | unset | The key that opens `/api` for a client. `bun run setApiKey` writes it. With neither `API_KEY` nor `AUTH_MODE`, the service refuses to start. | `src/http/server.ts`, `src/auth/access.ts`, `src/auth/set-api-key.ts` |
+| `API_KEY` | unset | The key that opens `/api` for a client. `bun run set-api-key` writes it. With neither `API_KEY` nor `AUTH_MODE`, the service refuses to start. | `src/http/server.ts`, `src/auth/access.ts`, `src/auth/set-api-key.ts` |
 | `AUTH_MODE` | unset, no sign-in | `password` or `oidc`, one at a time. Any other value stops the start. | `src/auth/config.ts`, `src/auth/set-password.ts` |
 | `AUTH_PASSWORD_HASH` | unset | The scrypt hash of the one password, for `AUTH_MODE=password`. `bun run set-password` writes it. A plain password is refused. | `src/auth/config.ts`, `src/auth/reset-credentials.ts` |
 | `AUTH_COOKIE_SECURE` | unset, `false` | `true` marks the session cookie `Secure`, for a service behind an HTTPS proxy. | `src/auth/cookies.ts` |
@@ -149,7 +149,7 @@ meaning.
 | `OIDC_SCOPES` | `openid email` | Space-separated scopes. `openid` is added when it is missing. | `src/auth/config.ts` |
 
 The commands that set and reset credentials are in the [commands table](setup.md#commands):
-`set-password`, `setApiKey` and `reset-credentials`.
+`set-password`, `set-api-key` and `reset-credentials`.
 
 ## Check it works
 
@@ -192,7 +192,7 @@ Neither `API_KEY` nor `AUTH_MODE` is set:
 Neither API_KEY nor AUTH_MODE is set, so nothing could open /api and the service will not start.
 ```
 
-Run `bun run setApiKey --burn-after-reading`, or set `AUTH_MODE`. The full message also names both
+Run `bun run set-api-key --burn-after-reading`, or set `AUTH_MODE`. The full message also names both
 fixes.
 
 Password mode without a hash, which is what `bun run reset-credentials` leaves behind:

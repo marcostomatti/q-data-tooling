@@ -1,4 +1,4 @@
-import type { TrackedForm } from '../../../entities/filing.ts';
+import type { FormBucket } from '../../../entities/filing.ts';
 import type { Filing, FilingPage } from '../../api.ts';
 import type { SelectionItem } from '@open-tomato/components';
 
@@ -6,11 +6,40 @@ import type { SelectionItem } from '@open-tomato/components';
 export const LATEST_FORM = '10-K';
 
 /**
- * The base forms the view groups filings under, in the order the groups show. It mirrors
- * `TrackedForm` in `src/entities/filing.ts`, which is imported as a type only so the bundle does
- * not carry zod; a test holds the two equal.
+ * The buckets the app groups, filters and counts filings by, in the order they show: the six
+ * named base forms, then `other` for every other form. It mirrors `FORM_BUCKETS` in
+ * `src/entities/filing.ts`, which is imported as a type only so the bundle does not carry zod; a
+ * test holds the two equal.
  */
-export const TRACKED_FORMS: readonly TrackedForm[] = ['10-K', '10-Q', '8-K'];
+export const FORM_BUCKETS: readonly FormBucket[] = ['10-K', '10-Q', '8-K', '6-K', '4', '144', 'other'];
+
+/** The bucket of every base form the app does not name. */
+export const OTHER_BUCKET = 'other' satisfies FormBucket;
+
+/**
+ * What the app calls each bucket. A form SEC numbers without letters reads as `Form 4`, the
+ * way filers say it, so a bare `4` is not taken for a count.
+ */
+export const FORM_LABELS: Readonly<Record<FormBucket, string>> = {
+  '10-K': '10-K',
+  '10-Q': '10-Q',
+  '8-K': '8-K',
+  '6-K': '6-K',
+  '4': 'Form 4',
+  '144': 'Form 144',
+  other: 'Other',
+};
+
+/**
+ * The bucket a filing's base form counts under, the way `bucketOf` in `src/entities/filing.ts`
+ * reads it.
+ *
+ * @param baseForm - The form without its `/A`, such as `10-K` or `SCHEDULE 13G`.
+ * @returns The form itself when the app names it, `other` otherwise.
+ */
+export function bucketOfForm(baseForm: string): FormBucket {
+  return FORM_BUCKETS.find((bucket) => bucket !== OTHER_BUCKET && bucket === baseForm) ?? OTHER_BUCKET;
+}
 
 /** The label of a filing's link to its primary document on sec.gov. */
 export const DOCUMENT_LINK_LABEL = 'Document';
@@ -30,7 +59,7 @@ export const FILINGS_MAX_PAGES = 10;
 /** What the view says while the filings are on their way. */
 export const FILINGS_LOADING = 'Loading filings…';
 
-/** What the view's empty state says when the company filed none of the tracked forms in the last year. */
+/** What the view's empty state says when the company filed nothing in the last year. */
 export const FILINGS_EMPTY_TITLE = 'No filings in the last year';
 
 /** The two bodies the view can show: option B, a right-side drawer, or option A, a full-screen modal. */
@@ -126,37 +155,54 @@ export function openInNewTab(url: string): void {
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 
-/** The filings of one tracked form, newest first. */
+/** The filings of one bucket, newest first. */
 export interface FormGroup {
-  /** The base form, amendments counted under it. */
-  readonly form: TrackedForm
+  /** The bucket: a named base form, amendments counted under it, or `other`. */
+  readonly form: FormBucket
   /** The form's filings, in the order the list held them. */
   readonly filings: readonly Filing[]
 }
 
 /**
- * Groups filings by base form, one group per entry of {@link TRACKED_FORMS} in its order, each
- * keeping the order the list held, so a newest-first list gives newest-first groups. A form the
- * company did not file is a group with no filings; a filing of an untracked form is left out.
+ * Groups filings by bucket, one group per entry of {@link FORM_BUCKETS} in its order, each
+ * keeping the order the list held, so a newest-first list gives newest-first groups. A bucket
+ * the company filed nothing in is a group with no filings; every form the app does not name
+ * goes in the `other` group.
  *
  * @param list - The company's filings.
- * @returns One group per tracked form.
+ * @returns One group per bucket.
  */
 export function groupByForm(list: readonly Filing[]): readonly FormGroup[] {
-  return TRACKED_FORMS.map((form) => ({
+  return FORM_BUCKETS.map((form) => ({
     form,
-    filings: list.filter((filing) => filing.baseForm === form),
+    filings: filingsIn(list, form),
   }));
 }
 
 /**
- * What a form's group says when the company filed none of it in the last year.
+ * The filings of one bucket, in the order the list held them.
  *
- * @param form - The base form.
- * @returns The line, such as `No 10-Q filings in the last year`.
+ * @param list - The company's filings.
+ * @param bucket - The bucket to keep, or `undefined` to keep every filing.
+ * @returns The filings whose base form counts under the bucket.
  */
-export function noFilingsOf(form: TrackedForm): string {
-  return `No ${form} filings in the last year`;
+export function filingsIn(list: readonly Filing[], bucket: FormBucket | undefined): readonly Filing[] {
+  return bucket === undefined
+    ? list
+    : list.filter((filing) => bucketOfForm(filing.baseForm) === bucket);
+}
+
+/**
+ * What a bucket's group says when the company filed none of it in the last year.
+ *
+ * @param form - The bucket.
+ * @returns The line, such as `No 10-Q filings in the last year` or `No other filings in the last year`.
+ */
+export function noFilingsOf(form: FormBucket): string {
+  const label = form === OTHER_BUCKET
+    ? 'other'
+    : FORM_LABELS[form];
+  return `No ${label} filings in the last year`;
 }
 
 /**

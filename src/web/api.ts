@@ -105,7 +105,7 @@ export interface CompanyQuery {
   readonly page: number
   /** The most companies one page holds. */
   readonly pageSize: number
-  /** A ticker prefix or part of a name; blank sends no `q`. */
+  /** A ticker prefix, part of a name or a CIK; blank sends no `q`. */
   readonly q: string
   /** Keeps only the companies in the summary when set; unset sends no `selected`. */
   readonly selectedOnly: boolean
@@ -173,7 +173,7 @@ export type Filing = FilingPage['filings']['items'][number];
 
 /**
  * Builds the `GET /api/companies/:ticker/filings` path for one page, newest first, the route's
- * own default order. The ticker is encoded so a `/` or `?` in it stays in the segment.
+ * own default order, every form. The ticker is encoded so a `/` or `?` in it stays in the segment.
  *
  * @param ticker - The company's ticker, such as `AAPL`.
  * @param page - The page to fetch, from 1.
@@ -209,7 +209,7 @@ export type SummaryPage = SummaryOutput;
 export type CompanySummary = SummaryPage['items'][number];
 
 /**
- * Builds the `GET /api/filings/summary` path for one page, every tracked form counted.
+ * Builds the `GET /api/filings/summary` path for one page, every form counted.
  *
  * @param page - The page to fetch, from 1.
  * @param pageSize - The most companies one page holds.

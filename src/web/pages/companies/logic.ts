@@ -84,14 +84,3 @@ export function withSearch(query: CompanyQuery, text: string): CompanyQuery {
 export function withSelectedOnly(query: CompanyQuery, selectedOnly: boolean): CompanyQuery {
   return { ...query, selectedOnly, page: 1 };
 }
-
-/**
- * How many pages a total spans, at least one, so an empty result still reads `Page 1 of 1`.
- *
- * @param total - The count of matching companies across every page.
- * @param pageSize - The most companies one page holds.
- * @returns The page count, from 1.
- */
-export function pageCountOf(total: number, pageSize: number): number {
-  return Math.max(1, Math.ceil(total / pageSize));
-}

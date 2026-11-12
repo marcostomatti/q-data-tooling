@@ -145,6 +145,17 @@ describe('listCompanies', () => {
     expect(await listedNames({ q: 'EAGLE' })).toEqual(['AGNICO EAGLE MINES LTD']);
   });
 
+  test('matches q of digits as a whole CIK, and not as a part of one', async () => {
+    // Act / Assert: 320193 is Apple's CIK; 3201 starts it but is no CIK, so it matches nothing
+    expect(await listedNames({ q: '320193' })).toEqual(['Apple Inc.']);
+    expect(await listedNames({ q: '3201' })).toEqual([]);
+  });
+
+  test('matches q as a CIK written with its leading zeros, as the SEC pads it', async () => {
+    // Act / Assert
+    expect(await listedNames({ q: '0000320193' })).toEqual(['Apple Inc.']);
+  });
+
   test('matches q as a ticker prefix in any case', async () => {
     // Act / Assert
     expect(await listedNames({ q: 'wm' })).toEqual(['Walmart Inc.']);

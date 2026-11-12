@@ -75,7 +75,7 @@ describe('the filing_summary tool', () => {
 
     expect(outcome.failed).toBe(false);
     expect(outcome.body).toMatchObject({
-      items: [{ cik: APPLE_CIK, ticker: 'AAPL', counts: { '10-K': 1, '10-Q': 0, '8-K': 0, total: 1 }, latest10K: { filingDate: '2026-11-03' } }],
+      items: [{ cik: APPLE_CIK, ticker: 'AAPL', counts: { '10-K': 1, '10-Q': 0, '8-K': 0, '6-K': 0, '4': 0, '144': 0, other: 0, total: 1 }, latest10K: { filingDate: '2026-11-03' } }],
       page: 1,
       pageSize: 25,
       total: 1,

@@ -1,12 +1,16 @@
 import type { Company, CompanyPage, CompanyQuery } from '../../src/web/api.ts';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
+import { ToolbarSummary, Touchable } from '@open-tomato/components';
 import { describe, expect, test } from 'bun:test';
+import { Children } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import { ApiError, createCompaniesClient } from '../../src/web/api.ts';
 import { pageFor } from '../../src/web/app.tsx';
 import { FilingsDialog } from '../../src/web/components/filings/index.tsx';
+import { Pager, pageCountOf, type PagerProps } from '../../src/web/components/pager.tsx';
+import { Pagination } from '../../src/web/components/ports/pagination.tsx';
 import {
   CompaniesPage,
 } from '../../src/web/pages/companies/index.tsx';
@@ -19,7 +23,6 @@ import {
   INITIAL_QUERY,
   NO_EXCHANGE,
   NOT_SYNCED,
-  pageCountOf,
   SELECTED_ONLY_LABEL,
   withCompany,
   withSearch,
@@ -29,10 +32,14 @@ import {
   CompanyRow,
 } from '../../src/web/pages/companies/row.tsx';
 import {
+  CompaniesToolbar,
+} from '../../src/web/pages/companies/toolbar.tsx';
+import {
   CompaniesView,
 } from '../../src/web/pages/companies/view.tsx';
 
 import { settle } from './settle.tsx';
+import { findElement, type AnyElement } from './tree.ts';
 
 const EMPTY: CompanyPage = { items: [], page: 1, pageSize: COMPANIES_PAGE_SIZE, total: 0 };
 
@@ -73,7 +80,7 @@ const stubApi = (page: CompanyPage) => ({
 
 /** The props a `CompanyRow` hands its `RowStatCard`, read without a DOM by calling the row. */
 interface CardProps {
-  readonly subtitle: ReactElement<{ variant: string, onClick: () => void }>
+  readonly subtitle: ReactElement<{ inline: boolean, children: string, onClick: () => void }>
   readonly action: ReactElement<{ onChange: (next: boolean) => void }>
 }
 
@@ -105,7 +112,7 @@ describe('CompaniesView', () => {
     expect(html).toMatch(new RegExp(`aria-selected="true"[^>]*>${SELECTED_ONLY_LABEL}</button>`));
     expect(html).toMatch(new RegExp(`aria-selected="false"[^>]*>${ALL_COMPANIES_LABEL}</button>`));
     expect(html).toContain('60 companies');
-    expect(html).toContain('Page 2 of 3');
+    expect(html).toMatch(/aria-current="page"[^>]*>2<\/button>/);
   });
 
   test('the filter shows every company when off', () => {
@@ -114,14 +121,44 @@ describe('CompaniesView', () => {
     expect(html).not.toContain('role="checkbox"');
   });
 
-  test('Previous is disabled on page 1 and Next on the last page', () => {
-    const first = renderToStaticMarkup(<CompaniesView result={{ ...EMPTY, total: 60 }} />);
-    expect(buttonTag(first, 'Previous')).toContain(DISABLED_ATTR);
-    expect(buttonTag(first, 'Next')).not.toContain(DISABLED_ATTR);
+  test('a list of a few pages pages with the Pagination port, one button per page', () => {
+    const html = renderToStaticMarkup(<CompaniesView result={{ ...EMPTY, total: 60 }} />);
+    for (const page of ['1', '2', '3']) expect(html).toContain(`>${page}</button>`);
+    expect(html).toMatch(/aria-current="page"[^>]*>1<\/button>/);
+    expect(html).not.toContain('Page 1 of 3');
+  });
 
-    const last = renderToStaticMarkup(<CompaniesView result={{ ...EMPTY, page: 3, total: 60 }} />);
-    expect(buttonTag(last, 'Previous')).not.toContain(DISABLED_ATTR);
-    expect(buttonTag(last, 'Next')).toContain(DISABLED_ATTR);
+  test('the Pagination asks for the page it was clicked on, counted from 1', () => {
+    const asked: number[] = [];
+    const tree = CompaniesToolbar({ search: '', selectedOnly: false, page: 1, pageCount: 3, total: 60, onPageChange: (page) => asked.push(page) });
+    const pager = findElement(tree, (element) => element.type === Pager);
+    const pagination = findElement(Pager(pager?.props as unknown as PagerProps), (element) => element.type === Pagination);
+    expect(pagination?.props.count).toBe(3);
+    expect(pagination?.props.index).toBe(0);
+    (pagination?.props.onChange as (index: number) => void)(2);
+    expect(asked).toEqual([3]);
+  });
+
+  test('the pager opens the summary row and the count closes it, so the pager keeps its place', () => {
+    const tree = CompaniesToolbar({ search: '', selectedOnly: false, page: 1, pageCount: 3, total: 60 });
+    const summary = findElement(tree, (element) => element.type === ToolbarSummary);
+    const [pager, count] = Children.toArray(summary?.props.children as ReactNode) as AnyElement[];
+    expect(pager?.type).toBe(Pager);
+    expect(count?.type).toBe('span');
+    expect(count?.props.className).toBe('ml-auto');
+    expect(renderToStaticMarkup(count)).toContain('60 companies');
+  });
+
+  test('every company, 321 pages, windows its pages around the current one, with the last in reach', () => {
+    const first = renderToStaticMarkup(<CompaniesView result={{ ...EMPTY, total: 8009 }} />);
+    expect(first).toMatch(/aria-current="page"[^>]*>1<\/button>/);
+    expect(buttonTag(first, '321')).not.toContain(DISABLED_ATTR);
+    expect(first).not.toContain('>6</button>');
+    expect(first).toMatch(/<button[^>]*aria-label="Previous"[^>]*disabled=""/);
+
+    const last = renderToStaticMarkup(<CompaniesView result={{ ...EMPTY, page: 321, total: 8009 }} />);
+    expect(last).toMatch(/aria-current="page"[^>]*>321<\/button>/);
+    expect(last).toMatch(/<button[^>]*aria-label="Next"[^>]*disabled=""/);
   });
 
   test('an error shows an alert instead of the empty state', () => {
@@ -139,12 +176,18 @@ describe('CompaniesView', () => {
 
 describe('CompanyRow', () => {
   test('shows the ticker, the name as a button and the three ministats', () => {
-    const html = renderToStaticMarkup(<CompanyRow company={APPLE} />);
+    const html = renderToStaticMarkup(<CompanyRow company={APPLE} onOpenFilings={() => undefined} />);
     expect(html).toContain('AAPL');
     expect(html).toMatch(/<button[^>]*>Apple Inc\.<\/button>/);
     expect(html).toContain('320193');
     expect(html).toContain('Nasdaq');
     expect(html).toContain('2026-11-10');
+  });
+
+  test('with nothing to open the filings, the name is plain text, not a button that does nothing', () => {
+    const html = renderToStaticMarkup(<CompanyRow company={APPLE} />);
+    expect(html).toContain('Apple Inc.');
+    expect(html).not.toMatch(/<button[^>]*>Apple Inc\.<\/button>/);
   });
 
   test('the switch reads the company\'s selected flag', () => {
@@ -164,10 +207,12 @@ describe('CompanyRow', () => {
     expect(html).toContain(NOT_SYNCED);
   });
 
-  test('the name is a ghost button that opens the filings by ticker', () => {
+  test('the name is a Touchable, a button with no padding, so it lines up under the ticker, and opens the filings by ticker', () => {
     const opened: string[] = [];
     const card = CompanyRow({ company: APPLE, onOpenFilings: (ticker) => opened.push(ticker) }) as ReactElement<CardProps>;
-    expect(card.props.subtitle.props.variant).toBe('ghost');
+    expect(card.props.subtitle.type).toBe(Touchable);
+    expect(card.props.subtitle.props.inline).toBe(true);
+    expect(card.props.subtitle.props.children).toBe(APPLE.name);
     card.props.subtitle.props.onClick();
     expect(opened).toEqual(['AAPL']);
   });
@@ -219,7 +264,7 @@ describe('CompaniesPage', () => {
     const api = stubApi(EMPTY);
     const html = renderToStaticMarkup(<CompaniesPage api={api} initial={{ ...EMPTY, total: 1 }} />);
     expect(html).toContain('1 company');
-    expect(html).toContain('Page 1 of 1');
+    expect(html).toMatch(/aria-current="page"[^>]*>1<\/button>/);
   });
 });
 

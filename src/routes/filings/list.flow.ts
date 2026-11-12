@@ -1,7 +1,7 @@
 import type { FilingListInput, FilingListOutput, FilingSort } from './contract.ts';
 import type { FilingSyncSources } from './sync.flow.ts';
 import type { Company } from '../../entities/company.ts';
-import type { Filing, TrackedForm } from '../../entities/filing.ts';
+import type { Filing, FormBucket } from '../../entities/filing.ts';
 import type { Log } from '../../logging.ts';
 
 import { NotFoundError } from '../../errors.ts';
@@ -17,8 +17,8 @@ import { syncIfStale } from './sync.flow.ts';
 export interface FilingPageQuery {
   /** The CIK of the company whose filings to read. */
   readonly cik: number
-  /** The base form to keep, or `undefined` to keep every tracked form. */
-  readonly form: TrackedForm | undefined
+  /** The bucket to keep, or `undefined` to keep every form. */
+  readonly form: FormBucket | undefined
   /** The order of the rows. */
   readonly sort: FilingSort
   /** The count of matching rows to skip. */
