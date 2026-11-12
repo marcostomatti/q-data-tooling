@@ -150,6 +150,18 @@ describe('the request spacing', () => {
     expect(stub.requests.map((request) => request.at)).toEqual([0, MIN_REQUEST_INTERVAL_MS]);
   });
 
+  test('a sleep that wakes early is topped up, so no request starts early', async () => {
+    const clock = fakeClock();
+    // Wakes 2 ms short of what was asked, as a real timer can, and on time for a short wait.
+    const sleep = (ms: number): Promise<void> => clock.sleep(ms > 2
+      ? ms - 2
+      : ms);
+    const stub = stubFetch(clock.now);
+    const client = createSecClient({ fetch: stub.fetch, userAgent: USER_AGENT, now: clock.now, sleep });
+    await clock.run(Promise.all([client.getSubmissions(CIK10), client.getSubmissions(CIK10), client.getSubmissions(CIK10)]));
+    expect(stub.requests.map((request) => request.at)).toEqual([0, MIN_REQUEST_INTERVAL_MS, 2 * MIN_REQUEST_INTERVAL_MS]);
+  });
+
   test('the default clock and sleep space real requests too', async () => {
     const stub = stubFetch(() => performance.now());
     const client = createSecClient({ fetch: stub.fetch, userAgent: USER_AGENT });
