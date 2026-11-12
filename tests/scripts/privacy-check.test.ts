@@ -100,6 +100,13 @@ describe('the generic rules', () => {
     expect(genericHits('/home/user/project and /home/runner/work and /Users/tester/x')).toEqual([]);
   });
 
+  test('a Claude Code log folder name holding a home folder is a home-path hit', () => {
+    expect(genericHits(joined('projects/-Us', 'ers-alice-projects-demo/a.jsonl'))).toEqual(['home-path']);
+    expect(genericHits(joined('-ho', 'me-alice-work'))).toEqual(['home-path']);
+    expect(genericHits('-Users-tester-x and -home-runner-work')).toEqual([]);
+    expect(genericHits('work-home-balance and a --home-dir flag')).toEqual([]);
+  });
+
   test('a free-mail address is an email hit, and a@example.test is not', () => {
     expect(genericHits(joined('mail someone@', 'gmail', '.com today'))).toEqual(['email']);
     expect(genericHits('mail a@example.test today')).toEqual([]);
