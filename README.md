@@ -134,6 +134,8 @@ The project's own pages:
 - [setup-prompt.md](setup-prompt.md): the schemas, link templates and snippets the spec uses.
 - [PLAN-sec-filings.md](docs/plans/PLAN-sec-filings.md): the task checklist the work runs through,
   stage by stage.
+- [Effort report](docs/effort-sec-filings.md): where the time went per phase and tool, idle time,
+  and what the work gained and lost, with the loop's minutes per plan stage.
 
 The template's pages, each covering one part:
 
