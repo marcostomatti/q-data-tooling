@@ -28,7 +28,8 @@ can point at one session without naming it.
 
 | Session | Key | Tool | Wall (min) | Agent working (min) | Waiting on the human (min) | Human prompts | Output tokens |
 |---|---|---|---:|---:|---:|---:|---:|
-| Setup and design | `steady-lovelace-b0d5af` | VS Code | 161 | 21 | 132 | 6, plus 3 interrupts and 5 answers | 243k |
+| Setup and design, plan mode (12:09 to 14:23) | `steady-lovelace-b0d5af` | VS Code | 134 | 7 | 126 | 3, plus 2 interrupts and 4 answers | 110k |
+| Setup and design, execute mode (14:23 to 14:50) | `steady-lovelace-b0d5af` | VS Code | 27 | 14 | 7 | 3, plus 1 interrupt and 1 answer | 133k |
 | Spec repair and loop prep | `quiet-noether-d03392` | CCD | 147 | 31 | 109 | 12, plus 1 interrupt and 1 answer | 343k |
 | `rafa plan create` | `brisk-turing-1ccc06` | rafa | 3 | 3 | 0 | 0 | 52k |
 | Loop: 56 tasks, wrap-up, CI repair | `patient-hopper-99144f` | rafa | 150 | 140 | 0 | 0 | 1.55M |
@@ -109,6 +110,37 @@ Agent idle time is the time a session sat waiting for the human, overnight left 
 in `steady-lovelace-b0d5af`, 109 in `quiet-noether-d03392` and 180 in `bold-curie-2c9638`, 421 in
 all.
 The loop never waited: each task session ended and the next one started within seconds.
+
+## Human active time
+
+Each human message counts as active time from the agent's last output before it, up to a window
+of 5 or 15 minutes: the time to read the reply, check it and write the next message. The hours
+before the first log come from the checkpoints in `NOTES.md`, 08:45 to 10:37. Messages in the
+template-service session count as foundation work on the open-tomato packages, and the rest as the
+assignment; time spent on both at once counts half to each.
+
+| Window | Assignment (min) | Foundation (min) |
+|---|---:|---:|
+| 5 min | 233 | 74 |
+| 15 min | 367 | 145 |
+| Average | 300 | 110 |
+
+Foundation work with no local log, such as the component library release used by the patching
+session, is not counted.
+
+### The ~4hs mark
+
+The ~4hs mark is the point where the running total of assignment time reaches about four hours.
+It falls between two commits, depending on how the window of inactivity is measured within each
+break:
+
+| Commit | Time (UTC) | What it holds | 5 min window | 15 min window | Average |
+|---|---|---|---:|---:|---:|
+| `d8d98f5` | 11-11 22:00 | The web UI rebuilt on the component library | 202 | 285 | 244 |
+| `8f1fa56` | 11-12 00:58 | Six named forms plus other, and the web pages finished | 217 | 330 | 274 |
+
+By then the loop had built the whole plan, and the work after these two commits was layout fixes,
+the Postgres test setup and docs.
 
 ## Building: the loop by stage
 
@@ -222,3 +254,15 @@ catches that form too (`scripts/privacy-check.ts`, with its test in
 forms allow. Three shapes are still left to a person or a denylist: session ids, the desktop
 app's session links, and paths written from the home folder shortcut, such as
 `projects/demo/src`. This page replaces each of them with a key or a pseudonym.
+
+## Updates
+
+- 2026-11-12: the VS Code row of the session table is split at the switch from plan mode to
+  execute mode, at 14:23:51, read from the session log's permission mode. The totals are the same.
+- 2026-11-12: the idle section counts the 12:23 to 14:00 gap as hands-on editing of the setup
+  prompt. The `NOTES.md` checkpoint at 14:00 says work resumed then, and the template-service
+  session holds messages at 12:35, so the gap was mostly a break with some foundation work. The
+  258 minutes when nobody was working are low by most of that gap.
+- 2026-11-12: the manual template merge at 15:06 to 15:10 was typed in the template-service
+  session, which the idle section does not read. The idle figures count the assignment's sessions
+  only; the human active time section reads both.
