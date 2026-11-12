@@ -44,7 +44,7 @@ export interface SecClientOptions {
   readonly userAgent: string
   /** How long one request may take, `DEFAULT_SEC_TIMEOUT_MS` when left out. */
   readonly timeoutMs?: number
-  /** The clock the spacing reads, in milliseconds, `Date.now` when left out. */
+  /** The clock the spacing reads, in milliseconds, `performance.now` when left out. */
   readonly now?: () => number
   /** Waits the given milliseconds, a `setTimeout` promise when left out. */
   readonly sleep?: (ms: number) => Promise<void>
@@ -156,15 +156,15 @@ const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => {
 
 /**
  * A gate that hands out request start times at least `MIN_REQUEST_INTERVAL_MS` apart. The slot is
- * reserved before the wait, so calls made at once queue up instead of all leaving together.
+ * reserved before the wait, so calls made at once queue up instead of all leaving together. A timer
+ * can wake a little early, so the wait goes on until the clock reaches the slot.
  */
 function createSpacer(now: () => number, sleep: (ms: number) => Promise<void>): () => Promise<void> {
   let nextFree = Number.NEGATIVE_INFINITY;
   return async () => {
-    const current = now();
-    const start = Math.max(current, nextFree);
+    const start = Math.max(now(), nextFree);
     nextFree = start + MIN_REQUEST_INTERVAL_MS;
-    if (start > current) await sleep(start - current);
+    for (let left = start - now(); left > 0; left = start - now()) await sleep(left);
   };
 }
 
@@ -178,7 +178,7 @@ function createSpacer(now: () => number, sleep: (ms: number) => Promise<void>): 
 export function createSecClient(options: SecClientOptions): SecClient {
   if (options.userAgent.trim() === '') throw new TypeError(`the SEC client needs a User-Agent; set ${SEC_USER_AGENT_VARIABLE}`);
   const timeoutMs = options.timeoutMs ?? DEFAULT_SEC_TIMEOUT_MS;
-  const awaitSlot = createSpacer(options.now ?? Date.now, options.sleep ?? defaultSleep);
+  const awaitSlot = createSpacer(options.now ?? (() => performance.now()), options.sleep ?? defaultSleep);
   const headers = { 'User-Agent': options.userAgent, Accept: 'application/json' };
 
   async function getJson(url: string): Promise<unknown> {

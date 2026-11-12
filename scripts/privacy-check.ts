@@ -151,7 +151,10 @@ export const GENERIC_RULES: readonly PatternRule[] = [
   {
     kind: 'pattern',
     label: 'home-path',
-    pattern: /(?:\\?\/(?:Users|home)\\?\/|[A-Za-z]:\\{1,2}Users\\{1,2})(?!(?:tester|user|runner)(?![\w.-]))[A-Za-z0-9._-]+/g,
+    // The second branch is the dashed form Claude Code names its log folders with, such as
+    // `-Users-<name>-projects-<repo>`, which a report built from those logs can carry.
+    pattern:
+      /(?:\\?\/(?:Users|home)\\?\/|[A-Za-z]:\\{1,2}Users\\{1,2})(?!(?:tester|user|runner)(?![\w.-]))[A-Za-z0-9._-]+|(?<![\w-])-(?:Users|home)-(?!(?:tester|user|runner)-)[A-Za-z0-9._]+/g,
   },
   {
     kind: 'pattern',

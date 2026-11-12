@@ -74,3 +74,19 @@ Check [~15.30] -- Claude decided to ignore indications, as it has started doing 
  5. I stopped the loop, made it clean up and fix the broken state.
  6. rebased the service repo properly.
  7. Updated this file.
+
+- Prepping rafa for the custom dir strcuture:
+  - Set up rafa with no board and no release bumps. This writes `.rafa/config.yaml`, the `.rafa/` folders and a rafa block in `.gitignore`.
+    `rafa init --yes --no-board --no-release`
+Point the plan and spec folders at `docs/`. By default rafa uses `.rafa/plans` and `.rafa/specs`, and `.gitignore` hides those. Folders under `docs/` sit outside `.rafa/`, so git tracks them like any other file. `rafa config set plan.dir=docs/plans && rafa config set specs.dir=docs/specs`
+  - Creating the plan: `rafa plan create --spec=docs/specs/<spec>.md`
+- Rafa ran the loop and the service was created properly but as expected the custom pages, outside what's boiler plate from the template standard where below minimum quality. I've run some interment sessions on the side, to perform ad-hoc fixes and tweaks during the evening. 
+- I'm including an [stats report](docs/effort-sec-filings.md) with the details of the sessions and time spent on it, and what was actually been worked on. 
+- About the stat reports, most of its data come from my own tooling `@open-tomato/rafa`, the same as the service and web packages. In `rafa effort` and other associated packages, I built tooling and hooks to extract proper metrics for analysis that I use to keep improving my tools and skills, as well as providing continuos learnings to the agents running in the same project via rafa. Most of the data is automatically collected during or at the end of the loop, but additional sweeps can be performed to pull data points from other sessions and projects in the same device or related sandboxes. 
+
+> [!note] Consideration about time spent
+> Bootstrapping the service, SEC survey, notes taking and the [task spec writing](setup-prompt.md) setting up the schemas and the desired logic structure took about 2 and 2 and a half hours. Put together the time I spent doing tweaks and reviewing if the app meets the acceptance criteria of the test should be around the 4hs mark. 
+>
+> That being side, linearly, the issues with the VSC agent made things harder to measure after the plan was created. Once resolved the conflicts, most of the remaining time I spent on the project was waiting for the loop to finish. Once `rafa loop start` was done, I spent an hour or two fixing defects and quirkiness on the ui or things that the template I use didn't have or had defined wrong, so those contribute only to the front end looking and working better, the service being easier to install and run, tests made on those things passing, and not rewriting the solution. 
+>
+> The stats report will show a detail of time spent and where, both from the human side and the tooling. There the ~4hs mark can be inferred where in the commits it should have happen.
