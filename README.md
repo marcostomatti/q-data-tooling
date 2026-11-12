@@ -108,6 +108,13 @@ bun run privacy                 # add `-- --no-gitleaks` when gitleaks is not in
 
 ## Read next
 
+How the code is laid out, one layer per page, with diagrams and examples:
+
+- [Data layer](docs/architecture/data.md): entities, repositories, tables and migrations.
+- [Service layer](docs/architecture/service.md): routes, flows, contracts, HTTP and MCP.
+- [Web app](docs/architecture/web.md): pages, the API client, the component library and the
+  build.
+
 The project's own pages:
 
 - [Spec](docs/specs/sec-filings.md): the stages of work, from endpoints to the summary page.
