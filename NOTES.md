@@ -64,29 +64,42 @@ Check [11.37]. -- done reviewing data structures and api and first query trials
 Check [~15.00] -- resuming work reviewing previous findings. Now building spec -> plan -> `rafa loop start`
 - Findings:
   - Ticker to CIK matching fail on seconday checks as some companies have multiple tickers, so the schema was split in a ticker mapping table against the company CIK, same behaviour on the api, the handling is internal.
-Check [~15.30] -- Claude decided to ignore indications, as it has started doing more often lately, and attempted a rebase of the original `template-service` into this project commit by commit. It left a non working branch with a half baked plan and modifying the context files. I have stopped and I'm fixing the changes, I'm about to start running the loop. 
+Check [~15.30] -- the setup session went off script. Instead of stopping at the spec, it wrote its own plan and started executing it, attempting a rebase of the original `template-service` into this project commit by commit. It left a non working branch, a half baked plan and modified context files. I stopped it and fixed the changes before running the loop.
 - Postmortem. Log of events:
-  1. After doing the manual research, checking the schemas and downloading sample files from the SEC and trying a few api and document fetches I updated and cleaned up this file with all the context I had.
- 1. I started a claude session in VSC specifically in `/plan` mode (blue prompt box checked) with @schema-survey-review.md first prompt. Indicating to look into this file, and check the schemas and files if we had the right thing and propose snippets of code and subsequent data structures. 
- 2. I picked, reviewed and cleaned up the code and updated the @setup-prompt.md context file.
- 3. I reiterated this process once more to ensure the prompt only produced a spec that I'll use to create a plan via `rafa plan create` and run manually, the indication was both in the prompt and in the setup-prompt.md file. 
- 4. Instead of writing the spec at the end of the task, it wrote its own plan and started executing it without tools or context provided by rafa's tooling. It cherry picked commit by commit from the sibling repo instead of running the proper tooling.
- 5. I stopped the loop, made it clean up and fix the broken state.
- 6. rebased the service repo properly.
- 7. Updated this file.
+  1. After doing the manual research, checking the schemas, downloading sample files from the SEC and trying a few api and document fetches, I updated and cleaned up this file with all the context I had.
+  2. I started a claude session in VSC in `/plan` mode (blue prompt box checked) with @schema-survey-review.md as the first prompt: look into this file, check the schemas and files, and propose code snippets and data structures.
+  3. I picked, reviewed and cleaned up the code and updated the @setup-prompt.md context file.
+  4. I iterated once more so the prompt only produced a spec, to create a plan with `rafa plan create` and run it manually. That was said both in the prompt and in setup-prompt.md.
+  5. Instead of writing the spec at the end of the task, it wrote its own plan and started executing it without rafa's tooling or context, cherry picking commit by commit from the sibling repo.
+  6. I stopped it, made it clean up and fix the broken state.
+  7. Rebased the service repo properly (template merge `bf1dff6`).
+  8. Updated this file.
 
-- Prepping rafa for the custom dir strcuture:
-  - Set up rafa with no board and no release bumps. This writes `.rafa/config.yaml`, the `.rafa/` folders and a rafa block in `.gitignore`.
-    `rafa init --yes --no-board --no-release`
-Point the plan and spec folders at `docs/`. By default rafa uses `.rafa/plans` and `.rafa/specs`, and `.gitignore` hides those. Folders under `docs/` sit outside `.rafa/`, so git tracks them like any other file. `rafa config set plan.dir=docs/plans && rafa config set specs.dir=docs/specs`
-  - Creating the plan: `rafa plan create --spec=docs/specs/<spec>.md`
-- Rafa ran the loop and the service was created properly but as expected the custom pages, outside what's boiler plate from the template standard where below minimum quality. I've run some interment sessions on the side, to perform ad-hoc fixes and tweaks during the evening. 
-- I'm including an [stats report](docs/effort-sec-filings.md) with the details of the sessions and time spent on it, and what was actually been worked on. 
-- About the stat reports, most of its data come from my own tooling `@open-tomato/rafa`, the same as the service and web packages. In `rafa effort` and other associated packages, I built tooling and hooks to extract proper metrics for analysis that I use to keep improving my tools and skills, as well as providing continuos learnings to the agents running in the same project via rafa. Most of the data is automatically collected during or at the end of the loop, but additional sweeps can be performed to pull data points from other sessions and projects in the same device or related sandboxes. 
-
-> [!note] Consideration about time spent
-> Bootstrapping the service, SEC survey, notes taking and the [task spec writing](setup-prompt.md) setting up the schemas and the desired logic structure took about 2 and 2 and a half hours. Put together the time I spent doing tweaks and reviewing if the app meets the acceptance criteria of the test should be around the 4hs mark. 
->
-> That being side, linearly, the issues with the VSC agent made things harder to measure after the plan was created. Once resolved the conflicts, most of the remaining time I spent on the project was waiting for the loop to finish. Once `rafa loop start` was done, I spent an hour or two fixing defects and quirkiness on the ui or things that the template I use didn't have or had defined wrong, so those contribute only to the front end looking and working better, the service being easier to install and run, tests made on those things passing, and not rewriting the solution. 
->
-> The stats report will show a detail of time spent and where, both from the human side and the tooling. There the ~4hs mark can be inferred where in the commits it should have happen.
+Check [~16.10] -- second pass, in a fresh session from the rafa repo: spec -> plan -> loop the proper way, with rafa's CLI.
+- CLI sequence for a project with no issue board (spec file, branch `main`, specs and plans tracked in `docs/`):
+  - `rafa init --yes --no-board --no-release`: writes `.rafa/config.yaml`, the `.rafa/` folders and the rafa block in `.gitignore`.
+  - `rafa config set plan.dir=docs/plans && rafa config set specs.dir=docs/specs`: rafa's defaults are `.rafa/plans` and `.rafa/specs`, which `.gitignore` hides; `docs/` is tracked like any other file.
+  - `rafa plan create --spec=docs/specs/<spec>.md`, then `rafa loop start --plan=docs/plans/PLAN-<spec>.md --create-branch`.
+- Before planning, I had it check `docs/specs/` and the root context files against rafa's spec norm. Everything below would have turned the gates red, or sent the loop sideways:
+  - The docs checks, the eslint ignores and the spec still said `docs/plan/`, but rafa writes to `docs/plans/`. The plan would have been read as a normal page and failed the paths and quoted-code tests.
+  - rafa writes one task per plan line, up to 665 chars (measured on rafa's own plans), and the width test caps at 100.
+  - `schema survey review.md` (with spaces) was referenced everywhere, but the file is `schema-survey-review.md`.
+  - The spec's "Current state" was stale (setup branch already merged, `bun install` already done), and phase 0 step 4 (copy the plan into docs) was obsolete.
+  - The spec wasn't on rafa's template: six headings, no "What can go wrong", and definition-of-done items that no command can show.
+  - The loop commits with `git add -A`, so anything I write here mid loop would end up in a task commit -> `git update-index --skip-worktree NOTES.md` for the run.
+  - CLAUDE.md told every session to run `rafa describe --output=json` (~240 KB). Every loop task is a "first time", so each one would read it.
+Check [~16.37] -- fixes, straight to `main`:
+  - `dca3514`: the docs checks read `docs/plans/` and `schema-survey-review.md`, and `docs/plans/` is exempt from the width check. Probed with a fake 300 char plan: passes in `docs/plans/`, fails in the old `docs/plan/`.
+  - `6e0dfa1`: `bun run privacy` failed on `.env`. The text rules only read tracked files, but gitleaks got the whole folder (`.env`, `.git/`, the gigabytes in `.tmp/`). Now gitleaks scans a temp copy of the tracked files only. Test first (red), then the fix. The same gap is upstream in `template-service`.
+  - `e8050ed`: spec moved to rafa's template.
+  - `ce15ada`: CLAUDE.md, loop sessions learn commands from `--help` and never run `rafa describe`.
+Check [~16.43] -- `rafa plan create --spec=docs/specs/sec-filings.md` -> 9 stages, 56 tasks. The planner's review read the spec as `ready`, with 7 non blocking gaps, each with the assumption it planned under (sec client in `src/sec/`, PATCH keeps the selection when SEC fails, 94 rows of every form with 13 in the tracked ones). Committed `7c082fa` and pushed, after a privacy scan of the history.
+Check [~16.59] -- `@open-tomato/charts` was missing (Summary page) and the dependency gate hook blocked `bun add`. Updated the hook: `bun install` and `bun add @open-tomato/*` (when not already in package.json) pass, `bunx` / `bun x` still ask first. `822e3c5`.
+Check [~17.33] -- 3 server tests red locally. At first it looked like `DATABASE_URL`, because the error names it. It was `AUTH_MODE=password` from `.env` (written by `set-password`) leaking into the tests, so the API key refusal never fired. The tests now clear `AUTH_MODE`. `4973e74`, 994 pass / 0 fail.
+  - Side note: `DATABASE_URL=sqlite://...` is not valid. Only `file:<path>`, `:memory:`, or unset (-> `./data/app.db`).
+- `SEC_USER_AGENT` added to `.env`. It's not auth and the records are public, but SEC blocks scripts that don't identify themselves: measured 403 with no UA, 403 with curl's default, 200 with `name email`. Browsers work because they send their own UA.
+Check [~17.xx] -- `rafa doctor --plan=docs/plans/PLAN-sec-filings.md` green, no loops running, `main` clean. Started the loop by hand: `rafa loop start --plan=docs/plans/PLAN-sec-filings.md --create-branch`.
+- After the merge: `git update-index --no-skip-worktree NOTES.md`, then commit this file.
+- Takeaways:
+  - The spec prompt also listed deliverables (README, copies of the spec and plan), which probably made it read as a work order. Next time the spec prompt asks for the spec only, and setup goes through the tool that owns it.
+  - Check the spec and the context files against the tool's norm before planning: most of the red gates here were naming drift between files written at different times.
